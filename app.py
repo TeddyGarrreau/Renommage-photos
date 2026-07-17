@@ -1,18 +1,23 @@
 import os
 import uuid
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
+import quable
 from core import (
     ANGLE_LABELS,
     CONTEXTE_LABELS,
     TYPE_LABELS,
+    find_existing_variants,
     is_valid_ean,
     is_valid_ref,
     next_available_filename,
     parse_studio_filename,
     save_as_compressed_jpg,
 )
+
+load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -62,6 +67,27 @@ def api_upload():
     return jsonify(results)
 
 
+@app.route("/api/lookup-ref/<ref>")
+def api_lookup_ref(ref):
+    if not is_valid_ref(ref):
+        return jsonify({"found": False})
+
+    quable_info = quable.get_product_info(ref)
+    if quable_info:
+        variants = [
+            {"ean": v["ean"], "type": quable_info["type"], "label": v["label"]}
+            for v in quable_info["variants"]
+        ]
+        return jsonify({"found": True, "source": "quable", "variants": variants})
+
+    variants = find_existing_variants(os.path.join(PHOTOS_ROOT, ref), ref)
+    if not variants:
+        return jsonify({"found": False})
+
+    variants = [{"ean": v["ean"], "type": v["type"], "label": None} for v in variants]
+    return jsonify({"found": True, "source": "photos", "variants": variants})
+
+
 @app.route("/api/photo/<path:temp_id>", methods=["DELETE"])
 def api_delete_photo(temp_id):
     safe_id = os.path.basename(temp_id)
@@ -97,9 +123,13 @@ def api_process():
                 os.remove(src_path)
             continue
 
-        if not is_valid_ean(ean):
+        ean_ok = (ean == "" and type_ == "P") or is_valid_ean(ean)
+        if not ean_ok:
             results.append(
-                {"temp_id": temp_id, "error": f"EAN invalide : \"{ean}\" doit contenir exactement 13 chiffres"}
+                {
+                    "temp_id": temp_id,
+                    "error": f"EAN invalide : \"{ean}\" doit contenir exactement 13 chiffres (vide autorisé uniquement pour le type Produit)",
+                }
             )
             if os.path.isfile(src_path):
                 os.remove(src_path)

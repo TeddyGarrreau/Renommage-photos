@@ -4,6 +4,7 @@ import re
 from PIL import Image
 
 MAX_BYTES = 1_000_000
+TARGET_SIZE = 3000
 
 ANGLE_LABELS = {
     "0": "Autre angle ou zoom",
@@ -69,7 +70,7 @@ def next_sequence_number(output_dir, ref, angle, contexte):
     """Scan output_dir for existing files matching the same
     ref/angle/contexte combination and return the next free sequence number."""
     prefix_pattern = re.compile(
-        rf"^{re.escape(ref)}_\d{{13}}_[PV]_H{re.escape(angle)}S_{re.escape(contexte)}_S(\d{{2}})_\d{{4}}_I\.jpg$",
+        rf"^{re.escape(ref)}_(?:\d{{13}})?_[PV]_H{re.escape(angle)}S_{re.escape(contexte)}_S(\d{{2}})_\d{{4}}_I\.jpg$",
         re.IGNORECASE,
     )
     max_seq = 0
@@ -85,6 +86,37 @@ def build_filename(ref, ean, type_, angle, contexte, seq, annee):
     return f"{ref}_{ean}_{type_}_H{angle}S_{contexte}_S{seq:02d}_{annee}_I.jpg"
 
 
+def find_existing_variants(dest_dir, ref):
+    """Look for already-renamed photos of this ref in dest_dir and return
+    every distinct EAN/type combination found (most recently modified
+    first), so the batch form can offer a choice when the product has
+    several variants (each with its own EAN). Returns an empty list if the
+    folder doesn't exist or has no matching file."""
+    if not os.path.isdir(dest_dir):
+        return []
+
+    pattern = re.compile(
+        rf"^{re.escape(ref)}_(\d{{13}})_([PV])_H\dS_[PNMT]_S\d{{2}}_\d{{4}}_I\.jpg$",
+        re.IGNORECASE,
+    )
+
+    seen = {}
+    for name in os.listdir(dest_dir):
+        m = pattern.match(name)
+        if not m:
+            continue
+        ean, type_ = m.group(1), m.group(2).upper()
+        mtime = os.path.getmtime(os.path.join(dest_dir, name))
+        key = (ean, type_)
+        if key not in seen or mtime > seen[key]:
+            seen[key] = mtime
+
+    return [
+        {"ean": ean, "type": type_}
+        for (ean, type_), _ in sorted(seen.items(), key=lambda item: item[1], reverse=True)
+    ]
+
+
 def next_available_filename(dest_dir, ref, ean, type_, angle, contexte, annee):
     """Build the final filename, guaranteeing it doesn't collide with an
     existing file in dest_dir (bumping the sequence number as needed)."""
@@ -96,28 +128,36 @@ def next_available_filename(dest_dir, ref, ean, type_, angle, contexte, annee):
     return filename
 
 
-def save_as_compressed_jpg(src_path, dest_path, max_bytes=MAX_BYTES):
-    """Convert an image to JPEG and compress it (if needed) so the resulting
-    file is at or under max_bytes. Writes the result to dest_path."""
+def resize_to_square(img, size=TARGET_SIZE):
+    """Scale img to cover a size x size square, then crop the center so the
+    result is exactly size x size (may cut off the edges of non-square
+    source images)."""
+    width, height = img.size
+    scale = max(size / width, size / height)
+    new_width, new_height = round(width * scale), round(height * scale)
+    resized = img.resize((new_width, new_height), Image.LANCZOS)
+
+    left = (new_width - size) // 2
+    top = (new_height - size) // 2
+    return resized.crop((left, top, left + size, top + size))
+
+
+def save_as_compressed_jpg(src_path, dest_path, max_bytes=MAX_BYTES, target_size=TARGET_SIZE):
+    """Convert an image to a target_size x target_size JPEG (center-cropped)
+    and compress it (if needed) so the resulting file is at or under
+    max_bytes. Writes the result to dest_path."""
     with Image.open(src_path) as img:
         img = img.convert("RGB")
+        img = resize_to_square(img, target_size)
 
         quality = 90
         buffer = io.BytesIO()
         img.save(buffer, format="JPEG", quality=quality, optimize=True)
 
-        while buffer.tell() > max_bytes and quality > 20:
+        while buffer.tell() > max_bytes and quality > 10:
             quality -= 10
             buffer = io.BytesIO()
             img.save(buffer, format="JPEG", quality=quality, optimize=True)
-
-        while buffer.tell() > max_bytes:
-            width, height = img.size
-            img = img.resize((int(width * 0.85), int(height * 0.85)), Image.LANCZOS)
-            buffer = io.BytesIO()
-            img.save(buffer, format="JPEG", quality=max(quality, 60), optimize=True)
-            if min(img.size) < 200:
-                break
 
         with open(dest_path, "wb") as f:
             f.write(buffer.getvalue())

@@ -21,7 +21,7 @@ Exemple : `7069_3700256070693_P_H0S_M_S01_2023_I.jpg`
 | `EAN` | Code-barres EAN, 13 chiffres, unique par produit. **Validé strictement** (front + back) : erreur si différent de 13 chiffres. |
 | `Type` | `P` = Produit (pas de sous-référence) / `V` = Variante (produit avec sous-références). Une variante garde la même Ref mais a un EAN différent. |
 | `H{Angle}S` | `H` et `S` fixes, le chiffre au milieu (0-9) indique l'angle de vue :<br>0 = Autre angle/zoom, 1 = Face, 2 = 3/4 avant gauche, 3 = Côté gauche, 4 = 3/4 arrière gauche, 5 = Dos, 6 = 3/4 arrière droit, 7 = Côté droit, 8 = 3/4 avant droit, 9 = Vue du dessus |
-| `Contexte` | `P` = Produit emballé/Packshot, `N` = Produit nu/Préparé, `M` = Produit mis en situation, `T` = Produit + Texte (infographie). Un ancien code `Q` existe sur des photos historiques dans `Z:\Photos` mais n'est plus utilisé — ne pas le proposer dans l'interface. |
+| `Contexte` | `P` = Produit emballé/Packshot, `N` = Produit nu/Préparé, `M` = Produit mis en situation, `T` = Produit + Texte (infographie). Un ancien code `Q` existe sur des photos historiques dans `Z:\Photos` mais n'est plus utilisé — ne pas le proposer dans l'interface.<br>**Règle P vs N** : dès qu'une étiquette/carte/tag est encore attaché au produit (même sans carton/boîte complet), c'est `P` (emballé). `N` (nu) = produit vraiment seul, sans aucun élément d'emballage/étiquetage attaché. |
 | `S{NN}` | Numéro de séquence (01-99), incrémenté automatiquement quand plusieurs photos partagent la même Ref + Angle + Contexte |
 | `Année` | Année en cours au moment du traitement |
 | `I` | Suffixe fixe, ne change jamais |
@@ -29,19 +29,28 @@ Exemple : `7069_3700256070693_P_H0S_M_S01_2023_I.jpg`
 ## Contraintes fichier
 
 - Toutes les photos de sortie doivent être en `.jpg`
-- Poids max **1 Mo** par photo — compression automatique si besoin (qualité JPEG dégressive puis redimensionnement en dernier recours)
+- **Dimensions fixes : 3000x3000 px.** Chaque photo est redimensionnée pour couvrir un carré 3000x3000 puis **recadrée au centre** (les bords de l'image d'origine peuvent être coupés si elle n'est pas carrée — choix validé par Teddy plutôt que d'ajouter des bandes blanches ou de déformer l'image).
+- Poids max **1 Mo** par photo — compression automatique si besoin (qualité JPEG dégressive, de 90 jusqu'à 10 si nécessaire). Les dimensions restent toujours 3000x3000, seule la qualité JPEG varie pour respecter le poids max.
 
 ## Flux "manuel"
 
 Champs saisis une fois pour tout le lot (un lot = un produit) :
-- Référence produit
-- EAN
-- Type (P/V)
+- Référence produit — dès que le champ perd le focus, l'app interroge **l'API Quable** (source primaire) pour cette référence ; si Quable est injoignable/non configuré ou ne connaît pas la ref, elle se rabat automatiquement sur une lecture de `Z:\Photos\{Ref}\` (photos déjà nommées). Le statut affiché indique la source utilisée ("Quable" ou "Z:\Photos").
+- EAN (auto-rempli si produit trouvé, sinon à saisir)
+- Type (P/V) (idem)
 - Année (pré-rempli avec l'année en cours)
+
+**Cas des variantes (V)** : une référence peut avoir plusieurs EAN différents (un par variante). Si plusieurs EAN sont trouvés (Quable ou dossier), l'app affiche un sélecteur "Variante détectée" listant chaque EAN (+ label si dispo, ex: couleur) — l'utilisateur choisit la bonne variante au lieu de se faire imposer un EAN au hasard.
+
+**Photos génériques sur une référence à variantes** : si l'utilisateur force manuellement le champ Type sur "P" (Produit) alors que la référence a plusieurs variantes détectées, le champ EAN se vide, se désactive ("Non applicable") et le sélecteur de variante se cache — ces photos ne sont pas liées à une variante précise. Le nom de fichier final laisse le segment EAN vide (double underscore), ex : `4556__P_H1S_P_S01_2026_I.jpg`. Repasser le Type sur "V" réaffiche le sélecteur de variante et réactive le champ EAN (requis dans ce cas). Validé aussi côté serveur (`/api/process`) : EAN vide autorisé uniquement quand `type == "P"`.
+
+Aperçu du nom de fichier final affiché en direct sous chaque photo, mis à jour à chaque changement de champ (numéro de séquence affiché en `S••` car calculé côté serveur au moment du traitement).
 
 Champs saisis par photo :
 - Angle (0-9)
 - Contexte (P/N/M/T)
+
+**Confirmation de traitement** : au clic sur "Traiter et renommer", un bandeau s'affiche au-dessus des résultats — vert "X photo(s) traitée(s) avec succès" si tout est OK, orange si succès partiel (X traitées / Y erreurs), rouge si échec total (erreurs ou requête réseau en échec).
 
 ## Flux "studio"
 
@@ -62,18 +71,33 @@ Le reste du nom (`133_1_HD_1`) n'est pas utilisé.
 
 **Numéro de séquence** : généré automatiquement comme pour le flux manuel (incrémenté par combinaison Ref + Angle + Contexte).
 
-## Roadmap / à faire
+## Intégration Quable (API)
 
-- **Intégration Quable** : récupérer automatiquement l'info Produit/Variante (P/V) depuis le PIM au lieu du défaut `P` manuel. Nécessite de vérifier les capacités d'API exposées par Quable (clé API, endpoint, etc.). Pas encore commencé.
+Statut : **fait**, source primaire pour l'auto-remplissage EAN/Type (voir flux manuel ci-dessus). Repli automatique sur `Z:\Photos` si indisponible.
+
+- Doc API : https://developers.quable.com (v5), auth par header `Authorization: Bearer <token>`
+- Config dans `photo-renamer/.env` (jamais commité) : `QUABLE_API_TOKEN`, `QUABLE_BASE_URL` (ex: `https://add-one.quable.com`)
+- `GET /api/documents/{ref}` → document type `article`. Attributs clés :
+  - `attributes.article_art_ref` = référence
+  - `attributes.article_art_ean` = EAN (produit sans variante)
+  - `attributes.article_art_srefcod` = booléen, `true` si le produit a des sous-références (= Type `V`), `false` = Type `P`
+  - `documentLinks[]` où `linkType.id == "link_article_variant"` → chaque `target.id` est l'ID d'un document de type `variation` (une variante)
+- `GET /api/documents/{variation_id}` → document type `variation`. Attributs clés :
+  - `attributes.variation_sart_ref` = référence (identique au parent)
+  - `attributes.variation_sart_ean` = EAN de cette variante précise
+  - `attributes.variation_sart_sref1` = libellé de la variante (ex: couleur "NOIR")
+- Module `quable.py` : `get_product_info(ref)` fait ces appels et retourne `{"type": "P"|"V", "variants": [{"ean", "label"}]}`, ou `None` si Quable ne répond pas/pas configuré/ref inconnue (déclenche le repli `Z:\Photos`).
 
 ## Architecture technique
 
 - **Stack** : Python 3.12 + Flask + Pillow, interface web locale (HTML/CSS/JS vanilla)
-- `app.py` — routes Flask (`/`, `/api/upload`, `/api/photo/<temp_id>` DELETE, `/api/process`)
-- `core.py` — logique métier : parsing du nom studio, génération du nom final, compression JPEG, calcul du numéro de séquence
+- `app.py` — routes Flask (`/`, `/api/upload`, `/api/lookup-ref/<ref>`, `/api/photo/<temp_id>` DELETE, `/api/process`)
+- `core.py` — logique métier : parsing du nom studio, génération du nom final, compression JPEG, calcul du numéro de séquence, lecture des variantes existantes dans `Z:\Photos`
+- `quable.py` — appels à l'API Quable (voir section dédiée ci-dessus)
 - `templates/index.html` — page principale
 - `static/app.js`, `static/style.css` — logique front (drag & drop, formulaires, aperçus) et style
 - `uploads/` — stockage temporaire des photos importées avant traitement
+- `.env` (non commité, voir `.env.example`) — `QUABLE_API_TOKEN`, `QUABLE_BASE_URL`
 - **Sortie : `Z:\Photos\{Référence}\`** — les photos renommées/compressées sont écrites directement dans le lecteur réseau, dans le sous-dossier de la référence produit. Si le dossier référence existe déjà, les photos y sont ajoutées (numéro de séquence recalculé pour ne jamais écraser un fichier existant). S'il n'existe pas, il est créé automatiquement (nom = référence seule).
 
 ### Lancer l'application
