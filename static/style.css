@@ -47,6 +47,43 @@ h2 {
   color: #1f2430;
   margin: -4px 0 16px;
 }
+.site-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #d3d8e0;
+}
+.site-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+  opacity: 0.55;
+}
+.site-tab:hover {
+  color: #2b57d0;
+  opacity: 0.8;
+}
+.site-tab.active {
+  color: #2b57d0;
+  border-bottom-color: #2b57d0;
+  opacity: 1;
+}
+.site-tab-logo {
+  height: 28px;
+  width: auto;
+  max-width: 90px;
+  object-fit: contain;
+}
 .dropzone {
   border: 2px dashed #9aa3b2;
   border-radius: 10px;
@@ -151,6 +188,25 @@ input.invalid {
   color: #b3261e;
   background: #fdecea;
 }
+.dest-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.dest-folder-path {
+  font-size: 13px;
+  color: #6b7280;
+  word-break: break-all;
+}
+.checkbox-label {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px !important;
+}
+.checkbox-label input {
+  width: auto;
+}
 .badge {
   display: inline-block;
   font-size: 11px;
@@ -182,7 +238,7 @@ input.invalid {
   display: flex;
   gap: 12px;
 }
-#processBtn {
+#processBtn, #carrefourProcessBtn {
   padding: 12px 24px;
   font-size: 15px;
   font-weight: 600;
@@ -192,8 +248,8 @@ input.invalid {
   border-radius: 8px;
   cursor: pointer;
 }
-#processBtn:hover { background: #24469c; }
-#resetBtn {
+#processBtn:hover, #carrefourProcessBtn:hover { background: #24469c; }
+#resetBtn, #carrefourResetBtn, #chooseFolderBtn {
   padding: 12px 24px;
   font-size: 15px;
   font-weight: 600;
@@ -203,7 +259,7 @@ input.invalid {
   border-radius: 8px;
   cursor: pointer;
 }
-#resetBtn:hover { background: #f4f5f7; }
+#resetBtn:hover, #carrefourResetBtn:hover, #chooseFolderBtn:hover { background: #f4f5f7; }
 .result-list {
   margin-top: 24px;
 }

@@ -13,6 +13,19 @@ let photos = [];
 let manualGroups = new Map();
 const lookupCache = new Map();
 
+// --- Site tabs (Add-One / Carrefour) ---
+
+document.querySelectorAll(".site-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".site-tab").forEach((t) => t.classList.remove("active"));
+    tab.classList.add("active");
+
+    const site = tab.dataset.site;
+    document.querySelectorAll(".site-view").forEach((view) => view.classList.add("hidden"));
+    document.getElementById(`${site}View`).classList.remove("hidden");
+  });
+});
+
 function stripExtension(name) {
   const idx = name.lastIndexOf(".");
   return idx > 0 ? name.slice(0, idx) : name;
@@ -612,4 +625,268 @@ processBtn.addEventListener("click", async () => {
   processBtn.disabled = false;
   processBtn.textContent = "Traiter et renommer";
   fileInput.value = "";
+});
+
+// --- Carrefour tab ---
+
+const carrefourDropzone = document.getElementById("carrefourDropzone");
+const carrefourFileInput = document.getElementById("carrefourFileInput");
+const carrefourListEl = document.getElementById("carrefourList");
+const carrefourActionsEl = document.getElementById("carrefourActions");
+const carrefourProcessBtn = document.getElementById("carrefourProcessBtn");
+const carrefourResetBtn = document.getElementById("carrefourResetBtn");
+const carrefourResultListEl = document.getElementById("carrefourResultList");
+const chooseFolderBtn = document.getElementById("chooseFolderBtn");
+const destFolderPathEl = document.getElementById("destFolderPath");
+
+let carrefourPhotos = [];
+let destFolder = null;
+
+chooseFolderBtn.addEventListener("click", async () => {
+  chooseFolderBtn.disabled = true;
+  chooseFolderBtn.textContent = "Sélection en cours...";
+  try {
+    const res = await fetch("/api/browse-folder");
+    const data = await res.json();
+    if (data.error) {
+      alert(data.error);
+    } else if (data.path) {
+      destFolder = data.path;
+      destFolderPathEl.textContent = destFolder;
+      destFolderPathEl.classList.remove("not-found");
+    }
+  } finally {
+    chooseFolderBtn.disabled = false;
+    chooseFolderBtn.textContent = "Choisir le dossier de sortie";
+  }
+});
+
+carrefourDropzone.addEventListener("click", () => carrefourFileInput.click());
+carrefourDropzone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  carrefourDropzone.classList.add("drag");
+});
+carrefourDropzone.addEventListener("dragleave", () => carrefourDropzone.classList.remove("drag"));
+carrefourDropzone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  carrefourDropzone.classList.remove("drag");
+  handleCarrefourFiles(e.dataTransfer.files);
+});
+carrefourFileInput.addEventListener("change", () => handleCarrefourFiles(carrefourFileInput.files));
+
+async function handleCarrefourFiles(fileList) {
+  if (!fileList.length) return;
+
+  const formData = new FormData();
+  for (const file of fileList) formData.append("photos", file);
+
+  const res = await fetch("/api/carrefour/upload", { method: "POST", body: formData });
+  const uploaded = await res.json();
+
+  for (const item of uploaded) {
+    const suggestedNature = item.suggested ? item.suggested.nature : "";
+    carrefourPhotos.push({
+      ...item,
+      angle: item.suggested ? item.suggested.angle : "1",
+      nature: suggestedNature === null ? "?" : suggestedNature,
+      info: item.suggested ? item.suggested.info : false,
+    });
+  }
+
+  renderCarrefour();
+}
+
+function carrefourFilenamePreview(p) {
+  if (!p.parsed) return "(nom non reconnu)";
+  if (p.nature === "?") return "(choisir Emballé ou Nu avant traitement)";
+  const parts = [p.parsed.ean, p.angle];
+  if (p.nature) parts.push(p.nature);
+  if (p.info) parts.push("i");
+  return parts.join("_") + ".jpg";
+}
+
+function carrefourNatureOptionsHtml(p) {
+  const placeholder =
+    p.nature === "?" ? `<option value="?" selected disabled>-- Choisir Emballé ou Nu --</option>` : "";
+  return placeholder + optionsHtml(window.CARREFOUR_NATURE_LABELS, p.nature);
+}
+
+function refreshCarrefourPreviews() {
+  document.querySelectorAll("#carrefourList .photo-card").forEach((card) => {
+    const photo = carrefourPhotos.find((p) => p.temp_id === card.dataset.id);
+    if (photo) card.querySelector(".preview-name").textContent = carrefourFilenamePreview(photo);
+  });
+}
+
+async function removeCarrefourPhoto(tempId) {
+  await fetch(`/api/photo/${tempId}`, { method: "DELETE" });
+  carrefourPhotos = carrefourPhotos.filter((p) => p.temp_id !== tempId);
+  renderCarrefour();
+}
+
+async function resetCarrefourPhotos() {
+  await Promise.all(carrefourPhotos.map((p) => fetch(`/api/photo/${p.temp_id}`, { method: "DELETE" })));
+  carrefourPhotos = [];
+  carrefourResultListEl.innerHTML = "";
+  carrefourFileInput.value = "";
+  renderCarrefour();
+}
+
+carrefourResetBtn.addEventListener("click", resetCarrefourPhotos);
+
+function carrefourCardHtml(p) {
+  if (!p.parsed) {
+    return `
+    <div class="photo-card" data-id="${p.temp_id}">
+      <img src="${p.preview_url}" alt="">
+      <div class="meta">
+        <div class="name">${p.original_name}</div>
+        <div class="lookup-status not-found">Nom non reconnu — attendu : convention Add-One (ex: 710306_3601029899278_P_H1S_P_S01_2023_I.jpg)</div>
+      </div>
+      <button class="remove-btn" title="Supprimer cette photo">&times;</button>
+    </div>`;
+  }
+
+  return `
+  <div class="photo-card" data-id="${p.temp_id}">
+    <img src="${p.preview_url}" alt="">
+    <div class="meta">
+      <div class="name">${p.original_name}</div>
+      <div class="name">Ref: ${p.parsed.ref} · EAN: ${p.parsed.ean} · Contexte source: ${p.parsed.contexte}</div>
+      ${
+        p.nature === "?"
+          ? `<div class="lookup-status not-found">Ancien code Q détecté — choisis Emballé ou Nu ci-dessous</div>`
+          : ""
+      }
+      <div class="fields">
+        <label>Angle
+          <select class="cf-angle">${optionsHtml(window.CARREFOUR_ANGLE_LABELS, p.angle)}</select>
+        </label>
+        <label>Nature
+          <select class="cf-nature">${carrefourNatureOptionsHtml(p)}</select>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" class="cf-info" ${p.info ? "checked" : ""}>
+          Info produit visible (i)
+        </label>
+      </div>
+      <div class="preview-name">${carrefourFilenamePreview(p)}</div>
+    </div>
+    <button class="remove-btn" title="Supprimer cette photo">&times;</button>
+  </div>`;
+}
+
+function wireCarrefourCards() {
+  carrefourListEl.querySelectorAll(".photo-card").forEach((card) => {
+    const id = card.dataset.id;
+    const photo = carrefourPhotos.find((p) => p.temp_id === id);
+    card.querySelector(".remove-btn").addEventListener("click", () => removeCarrefourPhoto(id));
+
+    if (!photo.parsed) return;
+
+    const previewEl = card.querySelector(".preview-name");
+    card.querySelector(".cf-angle").addEventListener("change", (e) => {
+      photo.angle = e.target.value;
+      previewEl.textContent = carrefourFilenamePreview(photo);
+    });
+    card.querySelector(".cf-nature").addEventListener("change", (e) => {
+      photo.nature = e.target.value;
+      if (photo.nature === "AMB") {
+        photo.angle = "1";
+      }
+      renderCarrefour();
+    });
+    card.querySelector(".cf-info").addEventListener("change", (e) => {
+      photo.info = e.target.checked;
+      previewEl.textContent = carrefourFilenamePreview(photo);
+    });
+  });
+}
+
+function renderCarrefour() {
+  carrefourActionsEl.classList.toggle("hidden", carrefourPhotos.length === 0);
+  carrefourListEl.innerHTML = carrefourPhotos.map(carrefourCardHtml).join("");
+  wireCarrefourCards();
+}
+
+carrefourProcessBtn.addEventListener("click", async () => {
+  if (!destFolder) {
+    alert("Choisis d'abord un dossier de sortie.");
+    return;
+  }
+
+  const unresolved = carrefourPhotos.filter((p) => p.parsed && p.nature === "?");
+  if (unresolved.length) {
+    alert(
+      `${unresolved.length} photo(s) avec l'ancien code Q attendent un choix Emballé/Nu avant de pouvoir traiter.`
+    );
+    return;
+  }
+
+  const unparsed = carrefourPhotos.filter((p) => !p.parsed);
+  const parsed = carrefourPhotos.filter((p) => p.parsed);
+
+  const preResults = unparsed.map((p) => ({
+    temp_id: p.temp_id,
+    error: "Nom de fichier non reconnu (convention Add-One requise)",
+  }));
+
+  const items = parsed.map((p) => ({
+    temp_id: p.temp_id,
+    ean: p.parsed.ean,
+    angle: p.angle,
+    nature: p.nature,
+    info: p.info,
+  }));
+
+  carrefourProcessBtn.disabled = true;
+  carrefourProcessBtn.textContent = "Traitement en cours...";
+
+  let results = preResults;
+  if (items.length) {
+    try {
+      const res = await fetch("/api/carrefour/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, dest_folder: destFolder }),
+      });
+      if (!res.ok) throw new Error(`Erreur serveur (${res.status})`);
+      const serverResults = await res.json();
+      results = preResults.concat(serverResults);
+    } catch (err) {
+      carrefourResultListEl.innerHTML = `<div class="result-banner error">Le traitement a échoué : ${err.message}</div>`;
+      carrefourProcessBtn.disabled = false;
+      carrefourProcessBtn.textContent = "Traiter et renommer";
+      return;
+    }
+  }
+
+  const successCount = results.filter((r) => !r.error).length;
+  const errorCount = results.length - successCount;
+
+  let banner;
+  if (errorCount === 0) {
+    banner = `<div class="result-banner success">${successCount} photo${successCount > 1 ? "s" : ""} traitée${successCount > 1 ? "s" : ""} avec succès</div>`;
+  } else if (successCount === 0) {
+    banner = `<div class="result-banner error">Échec du traitement : ${errorCount} erreur${errorCount > 1 ? "s" : ""}</div>`;
+  } else {
+    banner = `<div class="result-banner warning">${successCount} photo${successCount > 1 ? "s" : ""} traitée${successCount > 1 ? "s" : ""}, ${errorCount} erreur${errorCount > 1 ? "s" : ""}</div>`;
+  }
+
+  carrefourResultListEl.innerHTML =
+    banner +
+    results
+      .map((r) =>
+        r.error
+          ? `<div class="result-row error">Erreur (${r.temp_id}) : ${r.error}</div>`
+          : `<div class="result-row"><span>${r.path}</span><span>${r.size_kb} Ko</span></div>`
+      )
+      .join("");
+
+  carrefourPhotos = [];
+  carrefourListEl.innerHTML = "";
+  carrefourActionsEl.classList.add("hidden");
+  carrefourProcessBtn.disabled = false;
+  carrefourProcessBtn.textContent = "Traiter et renommer";
+  carrefourFileInput.value = "";
 });

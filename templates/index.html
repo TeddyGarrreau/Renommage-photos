@@ -9,34 +9,72 @@
 <div class="wrap">
   <h1>Renommage automatique de photos</h1>
 
-  <div id="dropzone" class="dropzone">
-    <p>Glisse tes photos ici, ou clique pour en choisir</p>
-    <input type="file" id="fileInput" multiple accept="image/*" hidden>
+  <div class="site-tabs">
+    <button class="site-tab active" data-site="addone">
+      Add-One
+      <img class="site-tab-logo" src="{{ url_for('static', filename='logo-addone.png') }}" alt="Logo Add-One">
+    </button>
+    <button class="site-tab" data-site="carrefour">
+      Carrefour
+      <img class="site-tab-logo" src="{{ url_for('static', filename='logo-carrefour.svg') }}" alt="Logo Carrefour">
+    </button>
   </div>
 
-  <section id="studioGroup" class="group hidden">
-    <h2>Photos studio <span class="badge studio">détection automatique</span></h2>
-    <div id="studioList" class="photo-list"></div>
-  </section>
+  <div id="addoneView" class="site-view">
+    <div id="dropzone" class="dropzone">
+      <p>Glisse tes photos ici, ou clique pour en choisir</p>
+      <input type="file" id="fileInput" multiple accept="image/*" hidden>
+    </div>
 
-  <section id="manualGroup" class="group hidden">
-    <h2>Photos manuelles <span class="badge manual">à compléter</span></h2>
-    <p class="hint">Une référence détectée dans le nom d'un dossier ou d'une photo crée automatiquement son propre lot ci-dessous, avec EAN/Type pré-remplis si le produit est connu.</p>
-    <div id="manualBatches"></div>
-  </section>
+    <section id="studioGroup" class="group hidden">
+      <h2>Photos studio <span class="badge studio">détection automatique</span></h2>
+      <div id="studioList" class="photo-list"></div>
+    </section>
 
-  <div id="actions" class="actions hidden">
-    <button id="resetBtn" class="secondary">Réinitialiser</button>
-    <button id="processBtn">Traiter et renommer</button>
+    <section id="manualGroup" class="group hidden">
+      <h2>Photos manuelles <span class="badge manual">à compléter</span></h2>
+      <p class="hint">Une référence détectée dans le nom d'un dossier ou d'une photo crée automatiquement son propre lot ci-dessous, avec EAN/Type pré-remplis si le produit est connu.</p>
+      <div id="manualBatches"></div>
+    </section>
+
+    <div id="actions" class="actions hidden">
+      <button id="resetBtn" class="secondary">Réinitialiser</button>
+      <button id="processBtn">Traiter et renommer</button>
+    </div>
+
+    <section id="resultList" class="result-list"></section>
   </div>
 
-  <section id="resultList" class="result-list"></section>
+  <div id="carrefourView" class="site-view hidden">
+    <p class="hint">Glisse des photos déjà nommées selon la convention Add-One (ex: <code>710306_3601029899278_P_H1S_P_S01_2023_I.jpg</code>) — Angle/Nature/Info sont pré-remplis automatiquement à partir du nom, à vérifier avant traitement. Le suffixe de doublon (X-Y) est calculé automatiquement au traitement.</p>
+
+    <div class="dest-folder-row">
+      <button id="chooseFolderBtn" class="secondary">Choisir le dossier de sortie</button>
+      <span id="destFolderPath" class="dest-folder-path">Aucun dossier choisi</span>
+    </div>
+
+    <div id="carrefourDropzone" class="dropzone">
+      <p>Glisse tes photos ici, ou clique pour en choisir</p>
+      <input type="file" id="carrefourFileInput" multiple accept="image/*" hidden>
+    </div>
+
+    <div id="carrefourList" class="photo-list"></div>
+
+    <div id="carrefourActions" class="actions hidden">
+      <button id="carrefourResetBtn" class="secondary">Réinitialiser</button>
+      <button id="carrefourProcessBtn">Traiter et renommer</button>
+    </div>
+
+    <section id="carrefourResultList" class="result-list"></section>
+  </div>
 </div>
 
 <script>
   window.ANGLE_LABELS = {{ angle_labels | tojson }};
   window.CONTEXTE_LABELS = {{ contexte_labels | tojson }};
   window.TYPE_LABELS = {{ type_labels | tojson }};
+  window.CARREFOUR_ANGLE_LABELS = {{ carrefour_angle_labels | tojson }};
+  window.CARREFOUR_NATURE_LABELS = {{ carrefour_nature_labels | tojson }};
 </script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>

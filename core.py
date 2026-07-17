@@ -128,7 +128,7 @@ def next_available_filename(dest_dir, ref, ean, type_, angle, contexte, annee):
     return filename
 
 
-def resize_to_square(img, size=TARGET_SIZE):
+def resize_to_square_cover(img, size=TARGET_SIZE):
     """Scale img to cover a size x size square, then crop the center so the
     result is exactly size x size (may cut off the edges of non-square
     source images)."""
@@ -142,13 +142,35 @@ def resize_to_square(img, size=TARGET_SIZE):
     return resized.crop((left, top, left + size, top + size))
 
 
-def save_as_compressed_jpg(src_path, dest_path, max_bytes=MAX_BYTES, target_size=TARGET_SIZE):
-    """Convert an image to a target_size x target_size JPEG (center-cropped)
-    and compress it (if needed) so the resulting file is at or under
-    max_bytes. Writes the result to dest_path."""
+def resize_to_square_contain(img, size=TARGET_SIZE, background=(255, 255, 255)):
+    """Scale img to fit entirely within a size x size square (no cropping,
+    no zooming in), then pad the remaining space with a solid background
+    color so the result is exactly size x size."""
+    width, height = img.size
+    scale = min(size / width, size / height)
+    new_width, new_height = round(width * scale), round(height * scale)
+    resized = img.resize((new_width, new_height), Image.LANCZOS)
+
+    canvas = Image.new("RGB", (size, size), background)
+    offset = ((size - new_width) // 2, (size - new_height) // 2)
+    canvas.paste(resized, offset)
+    return canvas
+
+
+def resize_to_square(img, size=TARGET_SIZE, mode="cover"):
+    if mode == "contain":
+        return resize_to_square_contain(img, size)
+    return resize_to_square_cover(img, size)
+
+
+def save_as_compressed_jpg(src_path, dest_path, max_bytes=MAX_BYTES, target_size=TARGET_SIZE, resize_mode="cover"):
+    """Convert an image to a target_size x target_size JPEG and compress it
+    (if needed) so the resulting file is at or under max_bytes. resize_mode
+    "cover" crops the center (may cut off edges); "contain" fits the whole
+    image and pads with white (no cropping/zooming). Writes to dest_path."""
     with Image.open(src_path) as img:
         img = img.convert("RGB")
-        img = resize_to_square(img, target_size)
+        img = resize_to_square(img, target_size, mode=resize_mode)
 
         quality = 90
         buffer = io.BytesIO()

@@ -4,6 +4,7 @@ import uuid
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
+import carrefour
 import quable
 from core import (
     ANGLE_LABELS,
@@ -35,6 +36,8 @@ def index():
         angle_labels=ANGLE_LABELS,
         contexte_labels=CONTEXTE_LABELS,
         type_labels=TYPE_LABELS,
+        carrefour_angle_labels=carrefour.ANGLE_LABELS,
+        carrefour_nature_labels=carrefour.NATURE_LABELS,
     )
 
 
@@ -161,6 +164,127 @@ def api_process():
         finally:
             if os.path.isfile(src_path):
                 os.remove(src_path)
+
+    return jsonify(results)
+
+
+@app.route("/api/browse-folder")
+def api_browse_folder():
+    try:
+        import tkinter
+        from tkinter import filedialog
+    except ImportError:
+        return jsonify({"error": "Selection de dossier indisponible sur ce poste (tkinter manquant)"}), 500
+
+    root = tkinter.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    try:
+        path = filedialog.askdirectory(title="Choisir le dossier de sortie Carrefour")
+    finally:
+        root.destroy()
+
+    return jsonify({"path": path or None})
+
+
+@app.route("/api/carrefour/upload", methods=["POST"])
+def api_carrefour_upload():
+    files = request.files.getlist("photos")
+    results = []
+
+    for f in files:
+        temp_id = f"{uuid.uuid4().hex}{os.path.splitext(f.filename)[1]}"
+        temp_path = os.path.join(UPLOAD_DIR, temp_id)
+        f.save(temp_path)
+
+        parsed = carrefour.parse_addone_filename(f.filename)
+        suggested = carrefour.suggest_carrefour_fields(parsed) if parsed else None
+
+        results.append(
+            {
+                "temp_id": temp_id,
+                "original_name": f.filename,
+                "preview_url": f"/uploads/{temp_id}",
+                "parsed": parsed,
+                "suggested": suggested,
+            }
+        )
+
+    return jsonify(results)
+
+
+@app.route("/api/carrefour/process", methods=["POST"])
+def api_carrefour_process():
+    payload = request.get_json(force=True)
+    items = payload.get("items", [])
+    dest_dir = str(payload.get("dest_folder", "")).strip()
+    results = []
+
+    if not dest_dir or not os.path.isdir(dest_dir):
+        return jsonify(
+            [{"temp_id": item.get("temp_id"), "error": "Dossier de destination invalide ou non choisi"} for item in items]
+        )
+
+    valid_items = []
+    for item in items:
+        temp_id = item["temp_id"]
+        ean = str(item["ean"]).strip()
+        angle = str(item["angle"]).strip()
+        nature = str(item.get("nature", "")).strip()
+        info = bool(item.get("info"))
+
+        src_path = os.path.join(UPLOAD_DIR, temp_id)
+
+        if not is_valid_ean(ean):
+            results.append(
+                {"temp_id": temp_id, "error": f"EAN invalide : \"{ean}\" doit contenir exactement 13 chiffres"}
+            )
+            if os.path.isfile(src_path):
+                os.remove(src_path)
+            continue
+
+        if not carrefour.is_valid_angle(angle):
+            results.append({"temp_id": temp_id, "error": f"Angle invalide : \"{angle}\""})
+            if os.path.isfile(src_path):
+                os.remove(src_path)
+            continue
+
+        if not carrefour.is_valid_nature(nature):
+            results.append({"temp_id": temp_id, "error": f"Nature invalide : \"{nature}\""})
+            if os.path.isfile(src_path):
+                os.remove(src_path)
+            continue
+
+        if not os.path.isfile(src_path):
+            results.append({"temp_id": temp_id, "error": "fichier introuvable"})
+            continue
+
+        valid_items.append(
+            {"temp_id": temp_id, "src_path": src_path, "ean": ean, "angle": angle, "nature": nature, "info": info}
+        )
+
+    doublons = carrefour.assign_doublons(valid_items)
+
+    for item, doublon in zip(valid_items, doublons):
+        filename = carrefour.build_filename(item["ean"], item["angle"], item["nature"], item["info"], doublon)
+        dest_path = os.path.join(dest_dir, filename)
+
+        try:
+            resize_mode = carrefour.resize_mode_for_nature(item["nature"])
+            size = save_as_compressed_jpg(item["src_path"], dest_path, resize_mode=resize_mode)
+            results.append(
+                {
+                    "temp_id": item["temp_id"],
+                    "filename": filename,
+                    "path": dest_path,
+                    "size_kb": round(size / 1024, 1),
+                }
+            )
+        except Exception as exc:
+            results.append({"temp_id": item["temp_id"], "error": str(exc)})
+        finally:
+            if os.path.isfile(item["src_path"]):
+                os.remove(item["src_path"])
 
     return jsonify(results)
 

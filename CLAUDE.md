@@ -95,17 +95,60 @@ Statut : **fait**, source primaire pour l'auto-remplissage EAN/Type (voir flux m
   - `attributes.variation_sart_sref1` = libellé de la variante (ex: couleur "NOIR")
 - Module `quable.py` : `get_product_info(ref)` fait ces appels et retourne `{"type": "P"|"V", "variants": [{"ean", "label"}]}`, ou `None` si Quable ne répond pas/pas configuré/ref inconnue (déclenche le repli `Z:\Photos`).
 
+## Flux "Carrefour"
+
+L'interface a deux onglets en haut (avec logos) : **Add-One** (flux décrit ci-dessus) et **Carrefour** (règles de nommage spécifiques à cette enseigne). Statut : **fait**.
+
+**Principe** : contrairement au flux Add-One, l'entrée du flux Carrefour est constituée de photos **déjà renommées selon la convention Add-One** (ex: `710306_3601029899278_P_H1S_P_S01_2023_I.jpg`). L'app parse ce nom pour en extraire EAN/Angle/Contexte, puis suggère automatiquement les champs équivalents côté Carrefour (modifiables avant traitement).
+
+### Convention de sortie Carrefour
+
+Format : `{EAN}_{Angle}_{Nature}_{Doublon}_{i}.jpg` — **chaque segment optionnel vide est complètement omis** (pas de underscore ni placeholder, contrairement à la convention Add-One). Exemple minimal : `3601029899278_1.jpg`. Exemple complet : `3133200000994_1_E_1-3_i.jpg`.
+
+| Segment | Détail |
+|---|---|
+| `EAN` | Repris tel quel depuis le nom Add-One source. Doit être un EAN valide (13 chiffres) — les photos "génériques" Add-One (EAN vide, Type forcé en P) ne peuvent pas être exportées vers Carrefour, faute d'identifiant produit. |
+| `Angle` | Codes Carrefour : `0`=3/4, `1`=Avant, `2`=Gauche, `3`=Dessus, `7`=Arrière, `8`=Droite, `9`=Dessous (pas de 4/5/6 ; `9`/Dessous n'a pas d'équivalent côté Add-One). |
+| `Nature` | `` (vide) = Emballé, `E` = Modèle d'expo, `PAV` = Prêt à vendre, `AMB` = Ambiance. |
+| `Doublon` | `X-Y` (photo X sur Y), ajouté uniquement s'il y a ≥2 photos partageant le même EAN+Angle+Nature **dans le même lot traité**. Le total Y n'est jamais recalculé rétroactivement si un nouveau lot ajoute d'autres doublons plus tard (comportement volontaire, validé par Teddy). |
+| `i` | Présent si la photo contient des informations produit visibles (texte/infographie). |
+
+### Correspondance Add-One → Carrefour (validée par Teddy)
+
+**Angles** : Face(1)→Avant(1), Côté gauche(3)→Gauche(2), Vue du dessus(9)→Dessus(3), Dos(5)→Arrière(7), Côté droit(7)→Droite(8), et les 4 vues 3/4 (2,4,6,8) + Autre angle/zoom(0) → 3/4(0).
+
+**Nature** (depuis le Contexte Add-One) : P (Packshot) → vide (Emballé), N (Nu/Préparé) → E (Modèle d'expo), M (Mis en situation) → AMB (Ambiance). Le contexte **T** (Produit + Texte) ne mappe à aucune Nature : il active uniquement le suffixe `i`, la Nature reste vide par défaut et doit être ajustée manuellement si besoin. Le code **PAV** n'a aucune correspondance côté Add-One — toujours choisi manuellement au cas par cas.
+
+**Ancien code Q** : certaines photos historiques Add-One utilisent encore le contexte `Q` (ancien code plus utilisé, cf. section "Flux studio"). Comme Q est ambigu entre Emballé et Nu/Modèle d'expo, l'app ne le déduit pas automatiquement : le champ Nature affiche un placeholder "-- Choisir Emballé ou Nu --" obligatoire, et le traitement est bloqué (message d'alerte) tant que l'utilisateur n'a pas choisi manuellement pour chaque photo concernée.
+
+**Règle Ambiance → Angle 1** : dès qu'une photo est taguée Nature = Ambiance (AMB), que ce soit par suggestion automatique (contexte M) ou par changement manuel du menu Nature, l'Angle est forcé/réinitialisé à `1` (Avant) — une photo d'ambiance n'a pas vraiment d'angle produit précis, on standardise sur 1 par défaut (reste modifiable ensuite si besoin).
+
+### Interface et traitement
+
+- Un bouton **"Choisir le dossier de sortie"** ouvre un sélecteur de dossier natif Windows (via `tkinter.filedialog`, exécuté côté serveur puisque l'app tourne en local sur le même poste) — pas de dossier de sortie fixe/imposé comme pour Add-One.
+- Chaque photo déposée est parsée automatiquement (`carrefour.parse_addone_filename`) ; si le nom ne correspond pas à la convention Add-One, la photo est rejetée avec un message clair (pas de traitement possible).
+- Champs Angle/Nature/case "Info produit visible" pré-remplis automatiquement mais éditables par photo avant traitement.
+- Mêmes contraintes fichier que Add-One (JPG, 3000x3000px, max 1 Mo, `core.save_as_compressed_jpg`), **sauf le mode de redimensionnement** qui dépend de la Nature :
+  - **Emballé (vide) et Modèle d'expo (E)** — photos sur fond blanc : l'image entière est mise à l'échelle pour tenir dans 3000x3000 **sans zoom/recadrage**, le reste est complété en blanc (`core.resize_to_square_contain`). Évite de couper le produit/packaging.
+  - **Ambiance (AMB) et Prêt à vendre (PAV)** — comportement inchangé : recadrage centré plein cadre (`core.resize_to_square_cover`, comme Add-One).
+  - Logique de choix : `carrefour.resize_mode_for_nature(nature)`.
+- Module `carrefour.py` : `parse_addone_filename`, `suggest_carrefour_fields`, `build_filename`, `assign_doublons` (regroupe les items d'un même lot par EAN+Angle+Nature et numérote les doublons).
+- Routes Flask : `GET /api/browse-folder` (sélecteur de dossier natif), `POST /api/carrefour/upload`, `POST /api/carrefour/process`.
+
 ## Architecture technique
 
 - **Stack** : Python 3.12 + Flask + Pillow, interface web locale (HTML/CSS/JS vanilla)
-- `app.py` — routes Flask (`/`, `/api/upload`, `/api/lookup-ref/<ref>`, `/api/photo/<temp_id>` DELETE, `/api/process`)
-- `core.py` — logique métier : parsing du nom studio, génération du nom final, compression JPEG, calcul du numéro de séquence, lecture des variantes existantes dans `Z:\Photos`
+- `app.py` — routes Flask (`/`, `/api/upload`, `/api/lookup-ref/<ref>`, `/api/photo/<temp_id>` DELETE, `/api/process`, `/api/browse-folder`, `/api/carrefour/upload`, `/api/carrefour/process`)
+- `core.py` — logique métier Add-One : parsing du nom studio, génération du nom final, compression JPEG, calcul du numéro de séquence, lecture des variantes existantes dans `Z:\Photos`
 - `quable.py` — appels à l'API Quable (voir section dédiée ci-dessus)
-- `templates/index.html` — page principale
+- `carrefour.py` — logique métier Carrefour (voir section dédiée ci-dessus)
+- `templates/index.html` — page principale (onglets Add-One / Carrefour)
 - `static/app.js`, `static/style.css` — logique front (drag & drop, formulaires, aperçus) et style
+- `static/logo-addone.png`, `static/logo-carrefour.svg` — logos affichés sous les onglets
 - `uploads/` — stockage temporaire des photos importées avant traitement
 - `.env` (non commité, voir `.env.example`) — `QUABLE_API_TOKEN`, `QUABLE_BASE_URL`
-- **Sortie : `Z:\Photos\{Référence}\`** — les photos renommées/compressées sont écrites directement dans le lecteur réseau, dans le sous-dossier de la référence produit. Si le dossier référence existe déjà, les photos y sont ajoutées (numéro de séquence recalculé pour ne jamais écraser un fichier existant). S'il n'existe pas, il est créé automatiquement (nom = référence seule).
+- **Sortie Add-One : `Z:\Photos\{Référence}\`** — les photos renommées/compressées sont écrites directement dans le lecteur réseau, dans le sous-dossier de la référence produit. Si le dossier référence existe déjà, les photos y sont ajoutées (numéro de séquence recalculé pour ne jamais écraser un fichier existant). S'il n'existe pas, il est créé automatiquement (nom = référence seule).
+- **Sortie Carrefour : dossier choisi par l'utilisateur** via le sélecteur natif, pas de structure imposée.
 
 ### Lancer l'application
 
