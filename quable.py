@@ -34,22 +34,30 @@ def _get(path):
     return resp.json()
 
 
+def _product_name(attrs):
+    name = attrs.get("article_name")
+    if not isinstance(name, dict):
+        return None
+    return name.get("fr_FR") or None
+
+
 def get_product_info(ref):
     """Look up a product by reference directly in Quable. Returns
-    {"type": "P"|"V", "variants": [{"ean": ..., "label": ...}, ...]}
+    {"type": "P"|"V", "name": ..., "variants": [{"ean": ..., "label": ...}, ...]}
     or None if Quable is unreachable, unconfigured, or the ref doesn't exist."""
     document = _get(f"/api/documents/{ref}")
     if not document:
         return None
 
     attrs = document.get("attributes", {})
+    name = _product_name(attrs)
     has_variants = bool(attrs.get("article_art_srefcod"))
 
     if not has_variants:
         ean = attrs.get("article_art_ean")
         if not ean:
             return None
-        return {"type": "P", "variants": [{"ean": ean, "label": None}]}
+        return {"type": "P", "name": name, "variants": [{"ean": ean, "label": None}]}
 
     variant_ids = [
         link["target"]["id"]
@@ -71,4 +79,4 @@ def get_product_info(ref):
     if not variants:
         return None
 
-    return {"type": "V", "variants": variants}
+    return {"type": "V", "name": name, "variants": variants}

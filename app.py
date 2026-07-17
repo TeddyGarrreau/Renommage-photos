@@ -78,14 +78,16 @@ def api_lookup_ref(ref):
             {"ean": v["ean"], "type": quable_info["type"], "label": v["label"]}
             for v in quable_info["variants"]
         ]
-        return jsonify({"found": True, "source": "quable", "variants": variants})
+        return jsonify(
+            {"found": True, "source": "quable", "name": quable_info.get("name"), "variants": variants}
+        )
 
     variants = find_existing_variants(os.path.join(PHOTOS_ROOT, ref), ref)
     if not variants:
         return jsonify({"found": False})
 
     variants = [{"ean": v["ean"], "type": v["type"], "label": None} for v in variants]
-    return jsonify({"found": True, "source": "photos", "variants": variants})
+    return jsonify({"found": True, "source": "photos", "name": None, "variants": variants})
 
 
 @app.route("/api/photo/<path:temp_id>", methods=["DELETE"])

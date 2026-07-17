@@ -3,31 +3,49 @@ const fileInput = document.getElementById("fileInput");
 const studioGroupEl = document.getElementById("studioGroup");
 const studioListEl = document.getElementById("studioList");
 const manualGroupEl = document.getElementById("manualGroup");
-const manualListEl = document.getElementById("manualList");
+const manualBatchesEl = document.getElementById("manualBatches");
 const actionsEl = document.getElementById("actions");
 const processBtn = document.getElementById("processBtn");
 const resetBtn = document.getElementById("resetBtn");
 const resultListEl = document.getElementById("resultList");
-const batchRefEl = document.getElementById("batchRef");
-const batchEanEl = document.getElementById("batchEan");
-const batchTypeEl = document.getElementById("batchType");
-const batchAnneeEl = document.getElementById("batchAnnee");
-
-batchAnneeEl.value = new Date().getFullYear();
 
 let photos = [];
+let manualGroups = new Map();
+const lookupCache = new Map();
+
+function stripExtension(name) {
+  const idx = name.lastIndexOf(".");
+  return idx > 0 ? name.slice(0, idx) : name;
+}
+
+function isImageFile(file) {
+  if (file.type && file.type.startsWith("image/")) return true;
+  return /\.(jpe?g|png|gif|bmp|tiff?|webp|heic)$/i.test(file.name);
+}
+
+function isValidRefFormat(s) {
+  return /^[A-Za-z0-9._-]+$/.test(s);
+}
+
+async function lookupRefCached(ref) {
+  if (lookupCache.has(ref)) return lookupCache.get(ref);
+  const promise = fetch(`/api/lookup-ref/${encodeURIComponent(ref)}`).then((res) => res.json());
+  lookupCache.set(ref, promise);
+  const data = await promise;
+  lookupCache.set(ref, data);
+  return data;
+}
 
 function computeFilenamePreview(p) {
-  const ref = p.mode === "studio" ? p.parsed.ref : batchRefEl.value.trim() || "???";
-  const type = p.mode === "studio" ? p.type : batchTypeEl.value;
-  let ean;
   if (p.mode === "studio") {
-    ean = p.parsed.ean;
-  } else {
-    const eanValue = batchEanEl.value.trim();
-    ean = eanValue || (type === "P" ? "" : "?????????????");
+    return `${p.parsed.ref}_${p.parsed.ean}_${p.type}_H${p.angle}S_${p.contexte}_S••_${p.parsed.annee}_I.jpg`;
   }
-  const annee = p.mode === "studio" ? p.parsed.annee : batchAnneeEl.value.trim() || "????";
+  const group = manualGroups.get(p.groupId) || {};
+  const ref = (group.ref || "").trim() || "???";
+  const type = group.type || "P";
+  const eanValue = (group.ean || "").trim();
+  const ean = eanValue || (type === "P" ? "" : "?????????????");
+  const annee = (group.annee || "").trim() || "????";
   return `${ref}_${ean}_${type}_H${p.angle}S_${p.contexte}_S••_${annee}_I.jpg`;
 }
 
@@ -36,117 +54,6 @@ function refreshAllPreviews() {
     const photo = photos.find((p) => p.temp_id === card.dataset.id);
     if (photo) card.querySelector(".preview-name").textContent = computeFilenamePreview(photo);
   });
-}
-
-[batchRefEl, batchEanEl, batchAnneeEl].forEach((el) => el.addEventListener("input", refreshAllPreviews));
-
-const refLookupStatusEl = document.getElementById("refLookupStatus");
-const variantPickerEl = document.getElementById("variantPicker");
-const variantSelectEl = document.getElementById("variantSelect");
-const defaultEanPlaceholder = batchEanEl.placeholder;
-
-let refHasVariants = false;
-
-function applyEanRequirementForType() {
-  if (batchTypeEl.value === "P" && refHasVariants) {
-    batchEanEl.value = "";
-    batchEanEl.disabled = true;
-    batchEanEl.classList.remove("invalid");
-    batchEanEl.placeholder = "Non applicable (type Produit)";
-    variantPickerEl.classList.add("hidden");
-  } else {
-    batchEanEl.disabled = false;
-    batchEanEl.placeholder = defaultEanPlaceholder;
-    if (refHasVariants) variantPickerEl.classList.remove("hidden");
-  }
-  refreshAllPreviews();
-}
-
-batchTypeEl.addEventListener("change", applyEanRequirementForType);
-
-function applyVariant(variant) {
-  batchEanEl.value = variant.ean;
-  batchTypeEl.value = variant.type;
-  refreshAllPreviews();
-}
-
-variantSelectEl.addEventListener("change", () => {
-  const variant = JSON.parse(variantSelectEl.value);
-  applyVariant(variant);
-});
-
-batchRefEl.addEventListener("change", async () => {
-  const ref = batchRefEl.value.trim();
-  refLookupStatusEl.textContent = "";
-  variantPickerEl.classList.add("hidden");
-  variantSelectEl.innerHTML = "";
-  refHasVariants = false;
-  batchEanEl.disabled = false;
-  batchEanEl.placeholder = defaultEanPlaceholder;
-  if (!ref) return;
-
-  const res = await fetch(`/api/lookup-ref/${encodeURIComponent(ref)}`);
-  const data = await res.json();
-
-  const sourceLabel = data.source === "quable" ? "Quable" : "Z:\\Photos";
-
-  if (data.found && data.variants.length === 1) {
-    applyVariant(data.variants[0]);
-    refLookupStatusEl.textContent = `Produit trouvé (${sourceLabel}) — EAN/Type pré-remplis`;
-    refLookupStatusEl.classList.remove("not-found");
-    batchEanEl.classList.remove("invalid");
-  } else if (data.found && data.variants.length > 1) {
-    refHasVariants = true;
-    refLookupStatusEl.textContent = `${data.variants.length} variantes trouvées (${sourceLabel}) — choisis le bon EAN ci-dessous, ou force le type en "Produit" si ces photos sont génériques (pas d'EAN)`;
-    refLookupStatusEl.classList.remove("not-found");
-    batchEanEl.classList.remove("invalid");
-    variantSelectEl.innerHTML = data.variants
-      .map((v) => `<option value='${JSON.stringify(v)}'>${v.label ? `${v.label} — ` : ""}${v.ean} (${v.type})</option>`)
-      .join("");
-    variantPickerEl.classList.remove("hidden");
-    applyVariant(data.variants[0]);
-  } else {
-    batchEanEl.value = "";
-    batchEanEl.classList.add("invalid");
-    refLookupStatusEl.textContent = "Nouveau produit — EAN à saisir manuellement";
-    refLookupStatusEl.classList.add("not-found");
-  }
-
-  applyEanRequirementForType();
-});
-
-dropzone.addEventListener("click", () => fileInput.click());
-dropzone.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  dropzone.classList.add("drag");
-});
-dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag"));
-dropzone.addEventListener("drop", (e) => {
-  e.preventDefault();
-  dropzone.classList.remove("drag");
-  handleFiles(e.dataTransfer.files);
-});
-fileInput.addEventListener("change", () => handleFiles(fileInput.files));
-
-async function handleFiles(fileList) {
-  if (!fileList.length) return;
-
-  const formData = new FormData();
-  for (const file of fileList) formData.append("photos", file);
-
-  const res = await fetch("/api/upload", { method: "POST", body: formData });
-  const uploaded = await res.json();
-
-  for (const item of uploaded) {
-    photos.push({
-      ...item,
-      angle: item.parsed ? item.parsed.angle : "1",
-      contexte: item.parsed ? item.parsed.contexte : "P",
-      type: item.parsed ? item.parsed.type : "P",
-    });
-  }
-
-  render();
 }
 
 function optionsHtml(labels, selected) {
@@ -158,6 +65,180 @@ function optionsHtml(labels, selected) {
     .join("");
 }
 
+// --- Drag & drop, including whole folders ---
+
+function readDirEntries(reader) {
+  return new Promise((resolve, reject) => {
+    let all = [];
+    const readBatch = () => {
+      reader.readEntries((entries) => {
+        if (!entries.length) {
+          resolve(all);
+        } else {
+          all = all.concat(entries);
+          readBatch();
+        }
+      }, reject);
+    };
+    readBatch();
+  });
+}
+
+async function traverseEntry(entry, path) {
+  if (entry.isFile) {
+    const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+    return [{ file, path: path + entry.name }];
+  }
+  if (entry.isDirectory) {
+    const reader = entry.createReader();
+    const children = await readDirEntries(reader);
+    let results = [];
+    for (const child of children) {
+      results = results.concat(await traverseEntry(child, `${path}${entry.name}/`));
+    }
+    return results;
+  }
+  return [];
+}
+
+dropzone.addEventListener("click", () => fileInput.click());
+dropzone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dropzone.classList.add("drag");
+});
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag"));
+dropzone.addEventListener("drop", async (e) => {
+  e.preventDefault();
+  dropzone.classList.remove("drag");
+
+  const items = e.dataTransfer.items;
+  let entries = [];
+
+  if (items && items.length && items[0].webkitGetAsEntry) {
+    const roots = [];
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+      if (entry) roots.push(entry);
+    }
+    for (const root of roots) {
+      entries = entries.concat(await traverseEntry(root, ""));
+    }
+  } else {
+    entries = Array.from(e.dataTransfer.files).map((file) => ({ file, path: file.name }));
+  }
+
+  handleFileEntries(entries);
+});
+fileInput.addEventListener("change", () => {
+  const entries = Array.from(fileInput.files).map((file) => ({ file, path: file.name }));
+  handleFileEntries(entries);
+});
+
+async function handleFileEntries(entries) {
+  const imageEntries = entries.filter(({ file }) => isImageFile(file));
+  if (!imageEntries.length) return;
+
+  const formData = new FormData();
+  for (const { file } of imageEntries) formData.append("photos", file);
+
+  const res = await fetch("/api/upload", { method: "POST", body: formData });
+  const uploaded = await res.json();
+
+  const newManualPhotos = [];
+
+  uploaded.forEach((item, i) => {
+    const path = imageEntries[i].path;
+    const parts = path.split("/");
+    const folderCandidate = parts.length > 1 ? parts[parts.length - 2] : null;
+    const fileCandidate = stripExtension(item.original_name);
+
+    const photo = {
+      ...item,
+      angle: item.parsed ? item.parsed.angle : "1",
+      contexte: item.parsed ? item.parsed.contexte : "P",
+      type: item.parsed ? item.parsed.type : "P",
+    };
+
+    if (photo.mode === "manual") {
+      photo.groupId = null;
+      photo.folderCandidate = folderCandidate;
+      photo.fileCandidate = fileCandidate;
+      newManualPhotos.push(photo);
+    }
+
+    photos.push(photo);
+  });
+
+  if (newManualPhotos.length) {
+    await assignManualGroups(newManualPhotos);
+  }
+
+  render();
+}
+
+// --- Manual batch grouping (one group per detected product ref) ---
+
+async function assignManualGroups(newManualPhotos) {
+  for (const photo of newManualPhotos) {
+    const candidates = [photo.folderCandidate, photo.fileCandidate].filter(
+      (c) => c && isValidRefFormat(c)
+    );
+
+    let groupId = null;
+    let lookupData = null;
+
+    for (const candidate of candidates) {
+      const data = await lookupRefCached(candidate);
+      if (data.found) {
+        groupId = candidate;
+        lookupData = data;
+        break;
+      }
+    }
+
+    const attemptedFolder = photo.folderCandidate && isValidRefFormat(photo.folderCandidate);
+    if (!groupId && attemptedFolder) {
+      groupId = photo.folderCandidate;
+    }
+    if (!groupId) groupId = "";
+
+    photo.groupId = groupId;
+
+    if (!manualGroups.has(groupId)) {
+      manualGroups.set(groupId, {
+        ref: groupId,
+        ean: "",
+        type: "P",
+        annee: String(new Date().getFullYear()),
+        hasVariants: false,
+        variants: [],
+        status: "",
+        statusIsError: false,
+      });
+
+      const group = manualGroups.get(groupId);
+      if (lookupData) {
+        const sourceLabel = lookupData.source === "quable" ? "Quable" : "Z:\\Photos";
+        group.name = lookupData.name || null;
+        if (lookupData.variants.length > 1) {
+          group.hasVariants = true;
+          group.variants = lookupData.variants;
+          group.ean = lookupData.variants[0].ean;
+          group.type = lookupData.variants[0].type;
+          group.status = `${lookupData.variants.length} variantes trouvées (${sourceLabel}) — vérifie l'EAN choisi, ou force le type en "Produit" si ces photos sont génériques`;
+        } else {
+          group.ean = lookupData.variants[0].ean;
+          group.type = lookupData.variants[0].type;
+          group.status = `Produit trouvé (${sourceLabel}) — EAN/Type pré-remplis automatiquement`;
+        }
+      } else if (groupId && attemptedFolder && groupId === photo.folderCandidate) {
+        group.status = "Nouveau produit — EAN à saisir manuellement";
+        group.statusIsError = true;
+      }
+    }
+  }
+}
+
 async function removePhoto(tempId) {
   await fetch(`/api/photo/${tempId}`, { method: "DELETE" });
   photos = photos.filter((p) => p.temp_id !== tempId);
@@ -167,6 +248,7 @@ async function removePhoto(tempId) {
 async function resetPhotos() {
   await Promise.all(photos.map((p) => fetch(`/api/photo/${p.temp_id}`, { method: "DELETE" })));
   photos = [];
+  manualGroups = new Map();
   resultListEl.innerHTML = "";
   fileInput.value = "";
   render();
@@ -232,6 +314,187 @@ function wireCards(container) {
   });
 }
 
+// --- Manual batch cards (one per detected/entered product ref) ---
+
+function applyEanRequirementForGroup(card, group) {
+  const eanInput = card.querySelector(".g-ean");
+  const variantPicker = card.querySelector(".g-variant-picker");
+
+  if (group.type === "P" && group.hasVariants) {
+    group.ean = "";
+    eanInput.value = "";
+    eanInput.disabled = true;
+    eanInput.classList.remove("invalid");
+    eanInput.placeholder = "Non applicable (type Produit)";
+    variantPicker.classList.add("hidden");
+  } else {
+    eanInput.disabled = false;
+    eanInput.placeholder = "3700256070693";
+    if (group.hasVariants) variantPicker.classList.remove("hidden");
+  }
+  refreshAllPreviews();
+}
+
+async function handleGroupRefChange(card, groupId) {
+  const group = manualGroups.get(groupId);
+  const ref = card.querySelector(".g-ref").value.trim();
+  group.ref = ref;
+
+  const statusEl = card.querySelector(".g-status");
+  const variantPicker = card.querySelector(".g-variant-picker");
+  const variantSelect = card.querySelector(".g-variant-select");
+  const eanInput = card.querySelector(".g-ean");
+  const typeSelect = card.querySelector(".g-type");
+  const productNameEl = card.querySelector(".product-name");
+
+  statusEl.textContent = "";
+  statusEl.classList.remove("not-found");
+  variantPicker.classList.add("hidden");
+  variantSelect.innerHTML = "";
+  group.hasVariants = false;
+  group.variants = [];
+  group.name = null;
+  productNameEl.textContent = "";
+  productNameEl.classList.add("hidden");
+  eanInput.disabled = false;
+  eanInput.placeholder = "3700256070693";
+
+  if (!ref) {
+    refreshAllPreviews();
+    return;
+  }
+
+  const data = await lookupRefCached(ref);
+  const sourceLabel = data.source === "quable" ? "Quable" : "Z:\\Photos";
+
+  if (data.found) {
+    group.name = data.name || null;
+    if (group.name) {
+      productNameEl.textContent = group.name;
+      productNameEl.classList.remove("hidden");
+    }
+  }
+
+  if (data.found && data.variants.length === 1) {
+    group.ean = data.variants[0].ean;
+    group.type = data.variants[0].type;
+    eanInput.value = group.ean;
+    typeSelect.value = group.type;
+    statusEl.textContent = `Produit trouvé (${sourceLabel}) — EAN/Type pré-remplis`;
+    eanInput.classList.remove("invalid");
+  } else if (data.found && data.variants.length > 1) {
+    group.hasVariants = true;
+    group.variants = data.variants;
+    group.ean = data.variants[0].ean;
+    group.type = data.variants[0].type;
+    eanInput.value = group.ean;
+    typeSelect.value = group.type;
+    statusEl.textContent = `${data.variants.length} variantes trouvées (${sourceLabel}) — choisis le bon EAN ci-dessous, ou force le type en "Produit" si ces photos sont génériques (pas d'EAN)`;
+    eanInput.classList.remove("invalid");
+    variantSelect.innerHTML = data.variants
+      .map((v) => `<option value='${JSON.stringify(v)}'>${v.label ? `${v.label} — ` : ""}${v.ean} (${v.type})</option>`)
+      .join("");
+    variantPicker.classList.remove("hidden");
+  } else {
+    group.ean = "";
+    eanInput.value = "";
+    eanInput.classList.add("invalid");
+    statusEl.textContent = "Nouveau produit — EAN à saisir manuellement";
+    statusEl.classList.add("not-found");
+  }
+
+  applyEanRequirementForGroup(card, group);
+}
+
+function wireManualBatch(card, groupId) {
+  const group = manualGroups.get(groupId);
+  const refInput = card.querySelector(".g-ref");
+  const eanInput = card.querySelector(".g-ean");
+  const typeSelect = card.querySelector(".g-type");
+  const anneeInput = card.querySelector(".g-annee");
+  const variantSelect = card.querySelector(".g-variant-select");
+
+  refInput.addEventListener("input", () => {
+    group.ref = refInput.value.trim();
+    refreshAllPreviews();
+  });
+  refInput.addEventListener("change", () => handleGroupRefChange(card, groupId));
+
+  eanInput.addEventListener("input", () => {
+    group.ean = eanInput.value.trim();
+    refreshAllPreviews();
+  });
+
+  anneeInput.addEventListener("input", () => {
+    group.annee = anneeInput.value.trim();
+    refreshAllPreviews();
+  });
+
+  typeSelect.addEventListener("change", () => {
+    group.type = typeSelect.value;
+    applyEanRequirementForGroup(card, group);
+  });
+
+  variantSelect.addEventListener("change", () => {
+    const variant = JSON.parse(variantSelect.value);
+    group.ean = variant.ean;
+    group.type = variant.type;
+    eanInput.value = variant.ean;
+    typeSelect.value = variant.type;
+    refreshAllPreviews();
+  });
+
+  wireCards(card.querySelector(".group-photo-list"));
+}
+
+function batchCardHtml(groupId, group, groupPhotos) {
+  const statusClass = group.statusIsError ? "not-found" : "";
+  const eanDisabled = group.type === "P" && group.hasVariants;
+  const eanPlaceholder = eanDisabled ? "Non applicable (type Produit)" : "3700256070693";
+  const variantOptionsHtml = (group.variants || [])
+    .map((v) => `<option value='${JSON.stringify(v)}'>${v.label ? `${v.label} — ` : ""}${v.ean} (${v.type})</option>`)
+    .join("");
+
+  return `
+  <section class="card manual-batch" data-group-id="${groupId}">
+    <h3>${groupId ? `Lot : ${groupId}` : "Lot (référence à saisir)"}</h3>
+    <div class="product-name ${group.name ? "" : "hidden"}">${group.name || ""}</div>
+    <div class="grid">
+      <label>Référence produit
+        <input type="text" class="g-ref" value="${group.ref || ""}" placeholder="7069">
+        <span class="lookup-status g-status ${statusClass}">${group.status || ""}</span>
+      </label>
+      <label>EAN (13 chiffres)
+        <input type="text" class="g-ean" value="${group.ean || ""}" placeholder="${eanPlaceholder}" maxlength="13" ${eanDisabled ? "disabled" : ""}>
+      </label>
+      <label>Type
+        <select class="g-type">${optionsHtml(window.TYPE_LABELS, group.type)}</select>
+      </label>
+      <label>Année
+        <input type="number" class="g-annee" value="${group.annee || ""}">
+      </label>
+    </div>
+    <label class="g-variant-picker variant-picker ${group.hasVariants ? "" : "hidden"}">Variante détectée (EAN différent selon la variante)
+      <select class="g-variant-select">${variantOptionsHtml}</select>
+    </label>
+    <div class="photo-list group-photo-list">${groupPhotos.map(buildCardHtml).join("")}</div>
+  </section>`;
+}
+
+function renderManualBatches(manualPhotos) {
+  manualBatchesEl.innerHTML = "";
+
+  for (const [groupId, group] of manualGroups.entries()) {
+    const groupPhotos = manualPhotos.filter((p) => p.groupId === groupId);
+    if (!groupPhotos.length) continue;
+    manualBatchesEl.insertAdjacentHTML("beforeend", batchCardHtml(groupId, group, groupPhotos));
+  }
+
+  manualBatchesEl.querySelectorAll(".manual-batch").forEach((card) => {
+    wireManualBatch(card, card.dataset.groupId);
+  });
+}
+
 function render() {
   const studioPhotos = photos.filter((p) => p.mode === "studio");
   const manualPhotos = photos.filter((p) => p.mode === "manual");
@@ -241,32 +504,38 @@ function render() {
   actionsEl.classList.toggle("hidden", photos.length === 0);
 
   studioListEl.innerHTML = studioPhotos.map(buildCardHtml).join("");
-  manualListEl.innerHTML = manualPhotos.map(buildCardHtml).join("");
-
   wireCards(studioListEl);
-  wireCards(manualListEl);
+
+  renderManualBatches(manualPhotos);
 }
 
 processBtn.addEventListener("click", async () => {
-  const batchRef = batchRefEl.value.trim();
-  const batchEan = batchEanEl.value.trim();
-  const batchType = batchTypeEl.value;
-  const batchAnnee = batchAnneeEl.value.trim();
+  const manualPhotos = photos.filter((p) => p.mode === "manual");
 
-  const hasManual = photos.some((p) => p.mode === "manual");
-  const eanValid = /^\d{13}$/.test(batchEan);
-  const eanExempt = batchType === "P" && batchEan === "";
+  for (const [groupId, group] of manualGroups.entries()) {
+    if (!manualPhotos.some((p) => p.groupId === groupId)) continue;
 
-  if (hasManual && !eanValid && !eanExempt) {
-    batchEanEl.classList.add("invalid");
-    batchEanEl.reportValidity
-      ? (batchEanEl.setCustomValidity("L'EAN doit contenir exactement 13 chiffres"),
-        batchEanEl.reportValidity())
-      : alert("L'EAN doit contenir exactement 13 chiffres");
-    return;
+    if (!(group.ref || "").trim()) {
+      alert(`Merci de renseigner la référence produit pour le lot "${groupId || "sans référence"}"`);
+      return;
+    }
+
+    const eanValid = /^\d{13}$/.test(group.ean || "");
+    const eanExempt = group.type === "P" && !group.ean;
+    if (!eanValid && !eanExempt) {
+      const eanInput = manualBatchesEl.querySelector(
+        `.manual-batch[data-group-id="${CSS.escape(groupId)}"] .g-ean`
+      );
+      if (eanInput) {
+        eanInput.classList.add("invalid");
+        eanInput.reportValidity
+          ? (eanInput.setCustomValidity("L'EAN doit contenir exactement 13 chiffres"),
+            eanInput.reportValidity())
+          : alert(`EAN invalide pour le lot "${groupId || "sans référence"}"`);
+      }
+      return;
+    }
   }
-  batchEanEl.classList.remove("invalid");
-  batchEanEl.setCustomValidity("");
 
   const items = photos.map((p) => {
     if (p.mode === "studio") {
@@ -280,14 +549,15 @@ processBtn.addEventListener("click", async () => {
         annee: p.parsed.annee,
       };
     }
+    const group = manualGroups.get(p.groupId) || {};
     return {
       temp_id: p.temp_id,
-      ref: batchRef,
-      ean: batchEan,
-      type: batchType,
+      ref: (group.ref || "").trim(),
+      ean: (group.ean || "").trim(),
+      type: group.type || "P",
       angle: p.angle,
       contexte: p.contexte,
-      annee: batchAnnee,
+      annee: (group.annee || "").trim(),
     };
   });
 
@@ -333,8 +603,9 @@ processBtn.addEventListener("click", async () => {
       .join("");
 
   photos = [];
+  manualGroups = new Map();
   studioListEl.innerHTML = "";
-  manualListEl.innerHTML = "";
+  manualBatchesEl.innerHTML = "";
   studioGroupEl.classList.add("hidden");
   manualGroupEl.classList.add("hidden");
   actionsEl.classList.add("hidden");

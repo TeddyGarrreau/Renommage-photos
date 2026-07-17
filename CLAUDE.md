@@ -34,8 +34,14 @@ Exemple : `7069_3700256070693_P_H0S_M_S01_2023_I.jpg`
 
 ## Flux "manuel"
 
-Champs saisis une fois pour tout le lot (un lot = un produit) :
-- Référence produit — dès que le champ perd le focus, l'app interroge **l'API Quable** (source primaire) pour cette référence ; si Quable est injoignable/non configuré ou ne connaît pas la ref, elle se rabat automatiquement sur une lecture de `Z:\Photos\{Ref}\` (photos déjà nommées). Le statut affiché indique la source utilisée ("Quable" ou "Z:\Photos").
+**Dépôt de dossiers et multi-produits** : on peut glisser un ou plusieurs dossiers contenant chacun plusieurs photos (pas seulement des fichiers isolés). L'app détecte automatiquement la référence produit de chaque groupe de photos, dans cet ordre de priorité :
+1. Le nom du dossier contenant la photo (ex: dossier `4556/`)
+2. Le nom du fichier lui-même, sans extension (ex: photo renommée `7069.jpg`)
+
+Pour chaque référence ainsi détectée, l'app tente une recherche (Quable puis `Z:\Photos` en repli) et crée automatiquement **un lot séparé** avec EAN/Type pré-remplis si le produit est trouvé. Si le dossier ne correspond à aucune référence connue, un lot est quand même créé pour ce dossier (EAN à saisir manuellement). Les photos isolées sans dossier ni nom exploitable tombent dans un lot par défaut (référence à saisir), comme avant. Chaque lot a ses propres champs Référence/EAN/Type/Année, modifiables indépendamment.
+
+Champs saisis une fois par lot (un lot = un produit) :
+- Référence produit — dès que le champ perd le focus, l'app interroge **l'API Quable** (source primaire) pour cette référence ; si Quable est injoignable/non configuré ou ne connaît pas la ref, elle se rabat automatiquement sur une lecture de `Z:\Photos\{Ref}\` (photos déjà nommées). Le statut affiché indique la source utilisée ("Quable" ou "Z:\Photos"). Si le produit est trouvé sur Quable, le **titre du produit** (attribut `article_name.fr_FR`) s'affiche sous le nom du lot, pour vérifier facilement qu'on a la bonne référence (non disponible via le repli `Z:\Photos`, qui ne connaît que les noms de fichiers).
 - EAN (auto-rempli si produit trouvé, sinon à saisir)
 - Type (P/V) (idem)
 - Année (pré-rempli avec l'année en cours)
@@ -81,6 +87,7 @@ Statut : **fait**, source primaire pour l'auto-remplissage EAN/Type (voir flux m
   - `attributes.article_art_ref` = référence
   - `attributes.article_art_ean` = EAN (produit sans variante)
   - `attributes.article_art_srefcod` = booléen, `true` si le produit a des sous-références (= Type `V`), `false` = Type `P`
+  - `attributes.article_name.fr_FR` = titre du produit (affiché dans l'interface pour vérification visuelle)
   - `documentLinks[]` où `linkType.id == "link_article_variant"` → chaque `target.id` est l'ID d'un document de type `variation` (une variante)
 - `GET /api/documents/{variation_id}` → document type `variation`. Attributs clés :
   - `attributes.variation_sart_ref` = référence (identique au parent)

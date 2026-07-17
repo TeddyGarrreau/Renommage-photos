@@ -33,6 +33,20 @@ h2 {
   margin: 0 0 12px;
   color: #444;
 }
+.hint {
+  font-size: 13px;
+  color: #6b7280;
+  margin: -8px 0 16px;
+}
+.manual-batch h3 {
+  color: #2b57d0;
+}
+.product-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1f2430;
+  margin: -4px 0 16px;
+}
 .dropzone {
   border: 2px dashed #9aa3b2;
   border-radius: 10px;

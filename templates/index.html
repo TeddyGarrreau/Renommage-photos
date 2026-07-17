@@ -21,34 +21,8 @@
 
   <section id="manualGroup" class="group hidden">
     <h2>Photos manuelles <span class="badge manual">à compléter</span></h2>
-
-    <section id="manualBatch" class="card">
-      <h3>Infos du lot (un lot = un produit)</h3>
-      <div class="grid">
-        <label>Référence produit
-          <input type="text" id="batchRef" placeholder="7069">
-          <span id="refLookupStatus" class="lookup-status"></span>
-        </label>
-        <label>EAN (13 chiffres)
-          <input type="text" id="batchEan" placeholder="3700256070693" maxlength="13">
-        </label>
-        <label>Type
-          <select id="batchType">
-            {% for code, label in type_labels.items() %}
-            <option value="{{ code }}">{{ code }} - {{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>Année
-          <input type="number" id="batchAnnee">
-        </label>
-      </div>
-      <label id="variantPicker" class="hidden variant-picker">Variante détectée (EAN différent selon la variante)
-        <select id="variantSelect"></select>
-      </label>
-    </section>
-
-    <div id="manualList" class="photo-list"></div>
+    <p class="hint">Une référence détectée dans le nom d'un dossier ou d'une photo crée automatiquement son propre lot ci-dessous, avec EAN/Type pré-remplis si le produit est connu.</p>
+    <div id="manualBatches"></div>
   </section>
 
   <div id="actions" class="actions hidden">
