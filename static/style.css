@@ -1,0 +1,169 @@
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, Segoe UI, Arial, sans-serif;
+  background: #f4f5f7;
+  margin: 0;
+  color: #1f2430;
+}
+.wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+h1 {
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+h2 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+.dropzone {
+  border: 2px dashed #9aa3b2;
+  border-radius: 10px;
+  padding: 40px;
+  text-align: center;
+  color: #5b6472;
+  cursor: pointer;
+  background: #fff;
+  transition: border-color .15s, background .15s;
+}
+.dropzone.drag {
+  border-color: #3b6ff0;
+  background: #eef3ff;
+}
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+.hidden { display: none !important; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  color: #444;
+  gap: 4px;
+}
+input, select {
+  padding: 8px 10px;
+  border: 1px solid #d3d8e0;
+  border-radius: 6px;
+  font-size: 14px;
+}
+input.invalid {
+  border-color: #b3261e;
+  background: #fdecea;
+}
+.photo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+.photo-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  align-items: flex-start;
+}
+.photo-card img {
+  width: 110px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #eee;
+  flex-shrink: 0;
+}
+.photo-card .meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.photo-card .name {
+  font-size: 13px;
+  color: #6b7280;
+  word-break: break-all;
+}
+.photo-card .remove-btn {
+  border: none;
+  background: none;
+  color: #9aa3b2;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.photo-card .remove-btn:hover {
+  color: #b3261e;
+  background: #fdecea;
+}
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  width: fit-content;
+}
+.badge.studio { background: #e6f4ea; color: #1e7a34; }
+.badge.manual { background: #eaf1ff; color: #2b57d0; }
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+}
+#processBtn {
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: #2b57d0;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#processBtn:hover { background: #24469c; }
+#resetBtn {
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #444;
+  background: #fff;
+  border: 1px solid #d3d8e0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#resetBtn:hover { background: #f4f5f7; }
+.result-list {
+  margin-top: 24px;
+}
+.result-row {
+  padding: 10px 14px;
+  background: #fff;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+.result-row.error { color: #b3261e; }

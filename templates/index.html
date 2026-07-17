@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Renommage photos - ADD-ONE</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="wrap">
+  <h1>Renommage automatique de photos</h1>
+
+  <div id="dropzone" class="dropzone">
+    <p>Glisse tes photos ici, ou clique pour en choisir</p>
+    <input type="file" id="fileInput" multiple accept="image/*" hidden>
+  </div>
+
+  <section id="manualBatch" class="card hidden">
+    <h2>Infos du lot (photos manuelles)</h2>
+    <div class="grid">
+      <label>Référence produit
+        <input type="text" id="batchRef" placeholder="7069">
+      </label>
+      <label>EAN (13 chiffres)
+        <input type="text" id="batchEan" placeholder="3700256070693" maxlength="13">
+      </label>
+      <label>Type
+        <select id="batchType">
+          {% for code, label in type_labels.items() %}
+          <option value="{{ code }}">{{ code }} - {{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Année
+        <input type="number" id="batchAnnee">
+      </label>
+    </div>
+  </section>
+
+  <section id="photoList" class="photo-list"></section>
+
+  <div id="actions" class="actions hidden">
+    <button id="resetBtn" class="secondary">Réinitialiser</button>
+    <button id="processBtn">Traiter et renommer</button>
+  </div>
+
+  <section id="resultList" class="result-list"></section>
+</div>
+
+<script>
+  window.ANGLE_LABELS = {{ angle_labels | tojson }};
+  window.CONTEXTE_LABELS = {{ contexte_labels | tojson }};
+  window.TYPE_LABELS = {{ type_labels | tojson }};
+</script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
