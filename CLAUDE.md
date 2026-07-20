@@ -102,7 +102,7 @@ Statut : **fait**, source primaire pour l'auto-remplissage EAN/Type (voir flux m
 
 ## Flux "Carrefour"
 
-L'interface a quatre onglets en haut (avec logos) : **PIM Quable** (flux décrit ci-dessus — le nommage "Add-One" sert en réalité à l'import dans le PIM Quable, d'où le logo Quable sur cet onglet et non le logo Add-One), **Carrefour** (règles de nommage spécifiques à cette enseigne), **Leclerc** et **Super U** (onglets préparés mais en attente des règles de nommage — voir section dédiée ci-dessous). Le gros logo Add-One en haut de page est celui de la société elle-même (identité de l'outil), pas celui d'un onglet en particulier. Statut Carrefour : **fait**.
+L'interface a deux onglets en haut (avec logos) : **PIM Quable** (flux décrit ci-dessus — le nommage "Add-One" sert en réalité à l'import dans le PIM Quable, d'où le logo Quable sur cet onglet et non le logo Add-One) et **Carrefour** (règles de nommage spécifiques à cette enseigne). Le gros logo Add-One en haut de page est celui de la société elle-même (identité de l'outil), pas celui d'un onglet en particulier. Statut : **fait**.
 
 **Principe** : contrairement au flux Add-One, l'entrée du flux Carrefour est constituée de photos **déjà renommées selon la convention Add-One** (ex: `710306_3601029899278_P_H1S_P_S01_2023_I.jpg`). L'app parse ce nom pour en extraire EAN/Angle/Contexte, puis suggère automatiquement les champs équivalents côté Carrefour (modifiables avant traitement).
 
@@ -140,10 +140,6 @@ Format : `{EAN}_{Angle}_{Nature}_{Doublon}_{i}.jpg` — **chaque segment optionn
 - Module `carrefour.py` : `parse_addone_filename`, `suggest_carrefour_fields`, `build_filename`, `assign_doublons` (regroupe les items d'un même lot par EAN+Angle+Nature et numérote les doublons).
 - Routes Flask : `GET /api/browse-folder` (sélecteur de dossier natif), `POST /api/carrefour/upload`, `POST /api/carrefour/process`.
 
-## Flux "Leclerc" et "Super U" (en préparation)
-
-Deux onglets supplémentaires existent dans l'interface (avec logos `static/logo-leclerc.webp` et `static/logo-superu.png`) mais affichent uniquement un message "Règles de nommage à venir" (`.coming-soon` dans `templates/index.html`/`style.css`) — **aucune logique de renommage/traitement n'est encore implémentée pour ces deux enseignes**. Statut : **en attente des règles de nommage de Teddy**. Une fois les règles fournies, s'inspirer de l'architecture du flux Carrefour (`carrefour.py`, routes `/api/carrefour/*`) pour construire les modules équivalents plutôt que de tout redévelopper depuis zéro.
-
 ## Architecture technique
 
 - **Stack** : Python 3.12 + Flask + Pillow, interface web locale (HTML/CSS/JS vanilla)
@@ -153,7 +149,7 @@ Deux onglets supplémentaires existent dans l'interface (avec logos `static/logo
 - `carrefour.py` — logique métier Carrefour (voir section dédiée ci-dessus)
 - `templates/index.html` — page principale (onglets Add-One / Carrefour)
 - `static/app.js`, `static/style.css` — logique front (drag & drop, formulaires, aperçus) et style
-- `static/logo-addone.png` — gros logo Add-One affiché dans l'en-tête de la page ; `static/logo-quable.png`, `static/logo-carrefour.svg`, `static/logo-leclerc.webp`, `static/logo-superu.png` — logos affichés dans les onglets (PIM Quable / Carrefour / Leclerc / Super U)
+- `static/logo-addone.png` — gros logo Add-One affiché dans l'en-tête de la page ; `static/logo-quable.png`, `static/logo-carrefour.svg` — logos affichés dans les onglets (PIM Quable / Carrefour)
 - `uploads/` — stockage temporaire des photos importées avant traitement
 - `.env` (non commité, voir `.env.example`) — `QUABLE_API_TOKEN`, `QUABLE_BASE_URL`
 - **Sortie Add-One : `Z:\Photos\{Référence}\`** — les photos renommées/compressées sont écrites directement dans le lecteur réseau, dans le sous-dossier de la référence produit. Si le dossier référence existe déjà, les photos y sont ajoutées (numéro de séquence recalculé pour ne jamais écraser un fichier existant). S'il n'existe pas, il est créé automatiquement (nom = référence seule).
