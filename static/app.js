@@ -8,10 +8,37 @@ const actionsEl = document.getElementById("actions");
 const processBtn = document.getElementById("processBtn");
 const resetBtn = document.getElementById("resetBtn");
 const resultListEl = document.getElementById("resultList");
+const addoneChooseFolderBtn = document.getElementById("addoneChooseFolderBtn");
+const addoneResetFolderBtn = document.getElementById("addoneResetFolderBtn");
+const addoneDestFolderPathEl = document.getElementById("addoneDestFolderPath");
 
 let photos = [];
 let manualGroups = new Map();
+let addoneDestFolder = null;
 const lookupCache = new Map();
+
+addoneChooseFolderBtn.addEventListener("click", async () => {
+  addoneChooseFolderBtn.disabled = true;
+  addoneChooseFolderBtn.textContent = "Sélection en cours...";
+  try {
+    const res = await fetch("/api/browse-folder");
+    const data = await res.json();
+    if (data.path) {
+      addoneDestFolder = data.path;
+      addoneDestFolderPathEl.textContent = addoneDestFolder;
+      addoneResetFolderBtn.classList.remove("hidden");
+    }
+  } finally {
+    addoneChooseFolderBtn.disabled = false;
+    addoneChooseFolderBtn.textContent = "Choisir un autre dossier";
+  }
+});
+
+addoneResetFolderBtn.addEventListener("click", () => {
+  addoneDestFolder = null;
+  addoneDestFolderPathEl.textContent = "Dossier par défaut (Z:\\Photos\\{référence})";
+  addoneResetFolderBtn.classList.add("hidden");
+});
 
 // --- Site tabs (Add-One / Carrefour) ---
 
@@ -67,6 +94,11 @@ function refreshAllPreviews() {
     const photo = photos.find((p) => p.temp_id === card.dataset.id);
     if (photo) card.querySelector(".preview-name").textContent = computeFilenamePreview(photo);
   });
+}
+
+function lowResWarningHtml(p) {
+  if (!p.low_res) return "";
+  return `<div class="lookup-status not-found">Résolution source ${p.width}x${p.height}px, inférieure à 3000x3000 — l'image sera agrandie et pourra perdre en netteté</div>`;
 }
 
 function optionsHtml(labels, selected) {
@@ -281,6 +313,7 @@ function buildCardHtml(p) {
     <div class="meta">
       <div class="name">${p.original_name}</div>
       ${refEanInfo}
+      ${lowResWarningHtml(p)}
       <div class="fields">
         <label>Angle
           <select class="f-angle">${optionsHtml(window.ANGLE_LABELS, p.angle)}</select>
@@ -582,7 +615,7 @@ processBtn.addEventListener("click", async () => {
     const res = await fetch("/api/process", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(items),
+      body: JSON.stringify({ items, dest_folder: addoneDestFolder }),
     });
     if (!res.ok) throw new Error(`Erreur serveur (${res.status})`);
     results = await res.json();
@@ -753,6 +786,7 @@ function carrefourCardHtml(p) {
     <div class="meta">
       <div class="name">${p.original_name}</div>
       <div class="name">Ref: ${p.parsed.ref} · EAN: ${p.parsed.ean} · Contexte source: ${p.parsed.contexte}</div>
+      ${lowResWarningHtml(p)}
       ${
         p.nature === "?"
           ? `<div class="lookup-status not-found">Ancien code Q détecté — choisis Emballé ou Nu ci-dessous</div>`

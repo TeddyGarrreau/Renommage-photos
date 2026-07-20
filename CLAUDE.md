@@ -31,6 +31,11 @@ Exemple : `7069_3700256070693_P_H0S_M_S01_2023_I.jpg`
 - Toutes les photos de sortie doivent être en `.jpg`
 - **Dimensions fixes : 3000x3000 px.** Chaque photo est redimensionnée pour couvrir un carré 3000x3000 puis **recadrée au centre** (les bords de l'image d'origine peuvent être coupés si elle n'est pas carrée — choix validé par Teddy plutôt que d'ajouter des bandes blanches ou de déformer l'image).
 - Poids max **1 Mo** par photo — compression automatique si besoin (qualité JPEG dégressive, de 90 jusqu'à 10 si nécessaire). Les dimensions restent toujours 3000x3000, seule la qualité JPEG varie pour respecter le poids max.
+- **Alerte basse résolution** : à l'upload (Add-One et Carrefour), l'app lit les dimensions réelles de la photo source (`core.get_image_size`) et affiche un avertissement sur la carte si la largeur ou la hauteur est inférieure à 3000px (`core.is_low_res`), car l'image sera alors agrandie (upscale) pour atteindre 3000x3000 et peut perdre en netteté. C'est **informatif uniquement** : ça ne bloque pas le traitement, contrairement au cas du code Q côté Carrefour.
+
+## Dossier de destination (Add-One)
+
+Par défaut, les photos renommées sont enregistrées dans `Z:\Photos\{Référence}\` (comportement historique, inchangé). Un bouton "Choisir un autre dossier" en haut de l'onglet Add-One ouvre le sélecteur de dossier natif Windows (même mécanisme que côté Carrefour, route `/api/browse-folder`) et permet de rediriger **tout le traitement en cours** vers un dossier choisi, quel que soit le nombre de lots/références traités ensemble. Le choix reste actif tant que "Revenir au dossier par défaut" n'est pas cliqué (il n'est pas réinitialisé automatiquement après un traitement). Le numéro de séquence (`S••`) est toujours calculé par scan du dossier de destination réel (par défaut ou personnalisé).
 
 ## Flux "manuel"
 
@@ -97,7 +102,7 @@ Statut : **fait**, source primaire pour l'auto-remplissage EAN/Type (voir flux m
 
 ## Flux "Carrefour"
 
-L'interface a deux onglets en haut (avec logos) : **Add-One** (flux décrit ci-dessus) et **Carrefour** (règles de nommage spécifiques à cette enseigne). Statut : **fait**.
+L'interface a deux onglets en haut (avec logos) : **PIM Quable** (flux décrit ci-dessus — le nommage "Add-One" sert en réalité à l'import dans le PIM Quable, d'où le logo Quable sur cet onglet et non le logo Add-One) et **Carrefour** (règles de nommage spécifiques à cette enseigne). Le gros logo Add-One en haut de page est celui de la société elle-même (identité de l'outil), pas celui d'un onglet en particulier. Statut : **fait**.
 
 **Principe** : contrairement au flux Add-One, l'entrée du flux Carrefour est constituée de photos **déjà renommées selon la convention Add-One** (ex: `710306_3601029899278_P_H1S_P_S01_2023_I.jpg`). L'app parse ce nom pour en extraire EAN/Angle/Contexte, puis suggère automatiquement les champs équivalents côté Carrefour (modifiables avant traitement).
 
@@ -144,7 +149,7 @@ Format : `{EAN}_{Angle}_{Nature}_{Doublon}_{i}.jpg` — **chaque segment optionn
 - `carrefour.py` — logique métier Carrefour (voir section dédiée ci-dessus)
 - `templates/index.html` — page principale (onglets Add-One / Carrefour)
 - `static/app.js`, `static/style.css` — logique front (drag & drop, formulaires, aperçus) et style
-- `static/logo-addone.png`, `static/logo-carrefour.svg` — logos affichés sous les onglets
+- `static/logo-addone.png` — gros logo Add-One affiché dans l'en-tête de la page ; `static/logo-quable.png`, `static/logo-carrefour.svg` — logos affichés dans les onglets (PIM Quable / Carrefour)
 - `uploads/` — stockage temporaire des photos importées avant traitement
 - `.env` (non commité, voir `.env.example`) — `QUABLE_API_TOKEN`, `QUABLE_BASE_URL`
 - **Sortie Add-One : `Z:\Photos\{Référence}\`** — les photos renommées/compressées sont écrites directement dans le lecteur réseau, dans le sous-dossier de la référence produit. Si le dossier référence existe déjà, les photos y sont ajoutées (numéro de séquence recalculé pour ne jamais écraser un fichier existant). S'il n'existe pas, il est créé automatiquement (nom = référence seule).

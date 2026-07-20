@@ -7,21 +7,31 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Renommage automatique de photos</h1>
+  <header class="app-header">
+    <img class="app-logo" src="{{ url_for('static', filename='logo-addone.png') }}" alt="Logo Add-One">
+    <div>
+      <h1>Renommage automatique de photos</h1>
+      <p class="app-subtitle">Prépare et exporte tes visuels produits pour le PIM Quable et pour Carrefour</p>
+    </div>
+  </header>
 
   <div class="site-tabs">
     <button class="site-tab active" data-site="addone">
-      Add-One
-      <img class="site-tab-logo" src="{{ url_for('static', filename='logo-addone.png') }}" alt="Logo Add-One">
+      <img class="site-tab-logo" src="{{ url_for('static', filename='logo-quable.png') }}" alt="Logo PIM Quable">
+      <span>PIM Quable</span>
     </button>
     <button class="site-tab" data-site="carrefour">
-      Carrefour
       <img class="site-tab-logo" src="{{ url_for('static', filename='logo-carrefour.svg') }}" alt="Logo Carrefour">
+      <span>Carrefour</span>
     </button>
   </div>
 
   <div id="addoneView" class="site-view">
     <div id="dropzone" class="dropzone">
+      <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M7 18C4.79 18 3 16.21 3 14C3 12.02 4.44 10.37 6.34 10.05C6.75 7.19 9.22 5 12.2 5C15.19 5 17.65 7.19 18.06 10.05C19.95 10.37 21.4 12.02 21.4 14C21.4 16.21 19.61 18 17.4 18H7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M12 20V12M12 12L9.2 14.8M12 12L14.8 14.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
       <p>Glisse tes photos ici, ou clique pour en choisir</p>
       <input type="file" id="fileInput" multiple accept="image/*" hidden>
     </div>
@@ -38,8 +48,15 @@
     </section>
 
     <div id="actions" class="actions hidden">
-      <button id="resetBtn" class="secondary">Réinitialiser</button>
-      <button id="processBtn">Traiter et renommer</button>
+      <div class="dest-folder-row">
+        <button id="addoneChooseFolderBtn" class="secondary">Choisir un autre dossier</button>
+        <span id="addoneDestFolderPath" class="dest-folder-path">Dossier par défaut (Z:\Photos\{référence})</span>
+        <button id="addoneResetFolderBtn" class="link-btn hidden">Revenir au dossier par défaut</button>
+      </div>
+      <div class="actions-buttons">
+        <button id="resetBtn" class="secondary">Réinitialiser</button>
+        <button id="processBtn">Traiter et renommer</button>
+      </div>
     </div>
 
     <section id="resultList" class="result-list"></section>
@@ -48,12 +65,11 @@
   <div id="carrefourView" class="site-view hidden">
     <p class="hint">Glisse des photos déjà nommées selon la convention Add-One (ex: <code>710306_3601029899278_P_H1S_P_S01_2023_I.jpg</code>) — Angle/Nature/Info sont pré-remplis automatiquement à partir du nom, à vérifier avant traitement. Le suffixe de doublon (X-Y) est calculé automatiquement au traitement.</p>
 
-    <div class="dest-folder-row">
-      <button id="chooseFolderBtn" class="secondary">Choisir le dossier de sortie</button>
-      <span id="destFolderPath" class="dest-folder-path">Aucun dossier choisi</span>
-    </div>
-
     <div id="carrefourDropzone" class="dropzone">
+      <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M7 18C4.79 18 3 16.21 3 14C3 12.02 4.44 10.37 6.34 10.05C6.75 7.19 9.22 5 12.2 5C15.19 5 17.65 7.19 18.06 10.05C19.95 10.37 21.4 12.02 21.4 14C21.4 16.21 19.61 18 17.4 18H7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M12 20V12M12 12L9.2 14.8M12 12L14.8 14.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
       <p>Glisse tes photos ici, ou clique pour en choisir</p>
       <input type="file" id="carrefourFileInput" multiple accept="image/*" hidden>
     </div>
@@ -61,8 +77,14 @@
     <div id="carrefourList" class="photo-list"></div>
 
     <div id="carrefourActions" class="actions hidden">
-      <button id="carrefourResetBtn" class="secondary">Réinitialiser</button>
-      <button id="carrefourProcessBtn">Traiter et renommer</button>
+      <div class="dest-folder-row">
+        <button id="chooseFolderBtn" class="secondary">Choisir le dossier de sortie</button>
+        <span id="destFolderPath" class="dest-folder-path">Aucun dossier choisi</span>
+      </div>
+      <div class="actions-buttons">
+        <button id="carrefourResetBtn" class="secondary">Réinitialiser</button>
+        <button id="carrefourProcessBtn">Traiter et renommer</button>
+      </div>
     </div>
 
     <section id="carrefourResultList" class="result-list"></section>

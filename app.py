@@ -11,6 +11,8 @@ from core import (
     CONTEXTE_LABELS,
     TYPE_LABELS,
     find_existing_variants,
+    get_image_size,
+    is_low_res,
     is_valid_ean,
     is_valid_ref,
     next_available_filename,
@@ -57,6 +59,7 @@ def api_upload():
         f.save(temp_path)
 
         parsed = parse_studio_filename(f.filename)
+        width, height = get_image_size(temp_path)
         results.append(
             {
                 "temp_id": temp_id,
@@ -64,6 +67,9 @@ def api_upload():
                 "preview_url": f"/uploads/{temp_id}",
                 "mode": "studio" if parsed else "manual",
                 "parsed": parsed,
+                "width": width,
+                "height": height,
+                "low_res": is_low_res(width, height),
             }
         )
 
@@ -108,7 +114,9 @@ def api_delete_photo(temp_id):
 
 @app.route("/api/process", methods=["POST"])
 def api_process():
-    items = request.get_json(force=True)
+    payload = request.get_json(force=True)
+    items = payload.get("items", [])
+    custom_dest = str(payload.get("dest_folder") or "").strip()
     results = []
 
     for item in items:
@@ -144,7 +152,7 @@ def api_process():
             results.append({"temp_id": temp_id, "error": "fichier introuvable"})
             continue
 
-        dest_dir = os.path.join(PHOTOS_ROOT, ref)
+        dest_dir = custom_dest if custom_dest else os.path.join(PHOTOS_ROOT, ref)
         os.makedirs(dest_dir, exist_ok=True)
         filename = next_available_filename(dest_dir, ref, ean, type_, angle, contexte, annee)
         dest_path = os.path.join(dest_dir, filename)
@@ -199,6 +207,7 @@ def api_carrefour_upload():
 
         parsed = carrefour.parse_addone_filename(f.filename)
         suggested = carrefour.suggest_carrefour_fields(parsed) if parsed else None
+        width, height = get_image_size(temp_path)
 
         results.append(
             {
@@ -207,6 +216,9 @@ def api_carrefour_upload():
                 "preview_url": f"/uploads/{temp_id}",
                 "parsed": parsed,
                 "suggested": suggested,
+                "width": width,
+                "height": height,
+                "low_res": is_low_res(width, height),
             }
         )
 

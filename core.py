@@ -58,6 +58,19 @@ def is_studio_filename(filename):
     return parse_studio_filename(filename) is not None
 
 
+def get_image_size(path):
+    """Return (width, height) of the image at path without loading full pixel data."""
+    with Image.open(path) as img:
+        return img.size
+
+
+def is_low_res(width, height, target=TARGET_SIZE):
+    """True if the source image is smaller than the export target in either
+    dimension, meaning it will be upscaled (and potentially blurred) rather
+    than only cropped/padded down to size."""
+    return width < target or height < target
+
+
 def is_valid_ean(ean):
     return bool(re.fullmatch(r"\d{13}", ean))
 
