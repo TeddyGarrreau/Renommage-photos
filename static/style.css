@@ -382,7 +382,7 @@ input.invalid {
   display: flex;
   gap: 12px;
 }
-#processBtn, #carrefourProcessBtn {
+#processBtn, #carrefourProcessBtn, #superuProcessBtn {
   padding: 12px 26px;
   font-size: 15px;
   font-weight: 700;
@@ -395,17 +395,17 @@ input.invalid {
   box-shadow: var(--shadow-sm);
   transition: background .15s, box-shadow .15s, transform .1s;
 }
-#processBtn:hover, #carrefourProcessBtn:hover {
+#processBtn:hover, #carrefourProcessBtn:hover, #superuProcessBtn:hover {
   background: var(--primary-dark);
   box-shadow: var(--shadow-md);
 }
-#processBtn:active, #carrefourProcessBtn:active { transform: translateY(1px); }
-#processBtn:disabled, #carrefourProcessBtn:disabled {
+#processBtn:active, #carrefourProcessBtn:active, #superuProcessBtn:active { transform: translateY(1px); }
+#processBtn:disabled, #carrefourProcessBtn:disabled, #superuProcessBtn:disabled {
   opacity: .6;
   cursor: default;
   transform: none;
 }
-#resetBtn, #carrefourResetBtn, #chooseFolderBtn, #addoneChooseFolderBtn {
+#resetBtn, #carrefourResetBtn, #chooseFolderBtn, #addoneChooseFolderBtn, #superuResetBtn, #superuChooseFolderBtn {
   padding: 12px 22px;
   font-size: 15px;
   font-weight: 600;
@@ -417,7 +417,7 @@ input.invalid {
   cursor: pointer;
   transition: background .15s, border-color .15s;
 }
-#resetBtn:hover, #carrefourResetBtn:hover, #chooseFolderBtn:hover, #addoneChooseFolderBtn:hover {
+#resetBtn:hover, #carrefourResetBtn:hover, #chooseFolderBtn:hover, #addoneChooseFolderBtn:hover, #superuResetBtn:hover, #superuChooseFolderBtn:hover {
   background: var(--primary-light);
   border-color: #c7d2f5;
   color: var(--primary-dark);
