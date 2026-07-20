@@ -458,3 +458,30 @@ input.invalid {
 .result-banner.warning::before { content: "!"; }
 .result-banner.error { background: var(--error-bg); color: var(--error-ink); }
 .result-banner.error::before { content: "✕"; }
+
+.coming-soon {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 56px 32px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+.coming-soon-logo {
+  height: 56px;
+  width: auto;
+  max-width: 180px;
+  object-fit: contain;
+  margin-bottom: 18px;
+  opacity: .85;
+}
+.coming-soon h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+.coming-soon .hint {
+  margin: 0;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+}

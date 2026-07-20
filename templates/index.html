@@ -24,6 +24,10 @@
       <img class="site-tab-logo" src="{{ url_for('static', filename='logo-carrefour.svg') }}" alt="Logo Carrefour">
       <span>Carrefour</span>
     </button>
+    <button class="site-tab" data-site="superu">
+      <img class="site-tab-logo" src="{{ url_for('static', filename='logo-superu.png') }}" alt="Logo Super U">
+      <span>Super U</span>
+    </button>
   </div>
 
   <div id="addoneView" class="site-view">
@@ -88,6 +92,14 @@
     </div>
 
     <section id="carrefourResultList" class="result-list"></section>
+  </div>
+
+  <div id="superuView" class="site-view hidden">
+    <div class="coming-soon">
+      <img class="coming-soon-logo" src="{{ url_for('static', filename='logo-superu.png') }}" alt="Logo Super U">
+      <h2>Règles de nommage Super U à venir</h2>
+      <p class="hint">Cet onglet sera activé dès que les règles de nommage spécifiques à Super U auront été communiquées.</p>
+    </div>
   </div>
 </div>
 
