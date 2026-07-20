@@ -924,3 +924,274 @@ carrefourProcessBtn.addEventListener("click", async () => {
   carrefourProcessBtn.textContent = "Traiter et renommer";
   carrefourFileInput.value = "";
 });
+
+// --- Super U tab ---
+
+const superuDropzone = document.getElementById("superuDropzone");
+const superuFileInput = document.getElementById("superuFileInput");
+const superuListEl = document.getElementById("superuList");
+const superuActionsEl = document.getElementById("superuActions");
+const superuProcessBtn = document.getElementById("superuProcessBtn");
+const superuResetBtn = document.getElementById("superuResetBtn");
+const superuResultListEl = document.getElementById("superuResultList");
+const superuChooseFolderBtn = document.getElementById("superuChooseFolderBtn");
+const superuDestFolderPathEl = document.getElementById("superuDestFolderPath");
+
+let superuPhotos = [];
+let superuDestFolder = null;
+
+superuChooseFolderBtn.addEventListener("click", async () => {
+  superuChooseFolderBtn.disabled = true;
+  superuChooseFolderBtn.textContent = "Sélection en cours...";
+  try {
+    const res = await fetch("/api/browse-folder");
+    const data = await res.json();
+    if (data.error) {
+      alert(data.error);
+    } else if (data.path) {
+      superuDestFolder = data.path;
+      superuDestFolderPathEl.textContent = superuDestFolder;
+      superuDestFolderPathEl.classList.remove("not-found");
+    }
+  } finally {
+    superuChooseFolderBtn.disabled = false;
+    superuChooseFolderBtn.textContent = "Choisir le dossier de sortie";
+  }
+});
+
+superuDropzone.addEventListener("click", () => superuFileInput.click());
+superuDropzone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  superuDropzone.classList.add("drag");
+});
+superuDropzone.addEventListener("dragleave", () => superuDropzone.classList.remove("drag"));
+superuDropzone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  superuDropzone.classList.remove("drag");
+  handleSuperuFiles(e.dataTransfer.files);
+});
+superuFileInput.addEventListener("change", () => handleSuperuFiles(superuFileInput.files));
+
+async function handleSuperuFiles(fileList) {
+  if (!fileList.length) return;
+
+  const formData = new FormData();
+  for (const file of fileList) formData.append("photos", file);
+
+  const res = await fetch("/api/superu/upload", { method: "POST", body: formData });
+  const uploaded = await res.json();
+
+  for (const item of uploaded) {
+    const suggestedContenu = item.suggested ? item.suggested.contenu : "";
+    superuPhotos.push({
+      ...item,
+      face: item.suggested ? item.suggested.face : "1",
+      angle_h: item.suggested ? item.suggested.angle_h : "N",
+      contenu: suggestedContenu === null ? "?" : suggestedContenu,
+      fab: "",
+    });
+  }
+
+  renderSuperu();
+}
+
+function superuMinSizeWarningHtml(p) {
+  if (!p.below_min_size) return "";
+  return `<div class="lookup-status not-found">Résolution source ${p.width}x${p.height}px — en dessous du minimum 1500px exigé par Système U sur au moins un côté (le fichier ne sera pas accepté par le portail)</div>`;
+}
+
+function toEan14(ean13) {
+  return ean13.padStart(14, "0");
+}
+
+function superuFilenamePreview(p) {
+  if (!p.parsed) return "(nom non reconnu)";
+  if (p.contenu === "?") return "(choisir Nu/déballé, Préparé, Emballé ou Mise en situation avant traitement)";
+  let name = `${toEan14(p.parsed.ean)}_C${p.face}${p.angle_h}${p.contenu}_s••`;
+  if (p.fab) name += `_FAB_${p.fab}`;
+  return name + ".jpg";
+}
+
+function superuContenuOptionsHtml(p) {
+  const placeholder =
+    p.contenu === "?" ? `<option value="?" selected disabled>-- Choisir le contenu --</option>` : "";
+  return placeholder + optionsHtml(window.SUPERU_CONTENU_LABELS, p.contenu);
+}
+
+async function removeSuperuPhoto(tempId) {
+  await fetch(`/api/photo/${tempId}`, { method: "DELETE" });
+  superuPhotos = superuPhotos.filter((p) => p.temp_id !== tempId);
+  renderSuperu();
+}
+
+async function resetSuperuPhotos() {
+  await Promise.all(superuPhotos.map((p) => fetch(`/api/photo/${p.temp_id}`, { method: "DELETE" })));
+  superuPhotos = [];
+  superuResultListEl.innerHTML = "";
+  superuFileInput.value = "";
+  renderSuperu();
+}
+
+superuResetBtn.addEventListener("click", resetSuperuPhotos);
+
+function superuCardHtml(p) {
+  if (!p.parsed) {
+    return `
+    <div class="photo-card" data-id="${p.temp_id}">
+      <img src="${p.preview_url}" alt="">
+      <div class="meta">
+        <div class="name">${p.original_name}</div>
+        <div class="lookup-status not-found">Nom non reconnu — attendu : convention Add-One (ex: 710306_3601029899278_P_H1S_P_S01_2023_I.jpg)</div>
+      </div>
+      <button class="remove-btn" title="Supprimer cette photo">&times;</button>
+    </div>`;
+  }
+
+  return `
+  <div class="photo-card" data-id="${p.temp_id}">
+    <img src="${p.preview_url}" alt="">
+    <div class="meta">
+      <div class="name">${p.original_name}</div>
+      <div class="name">Ref: ${p.parsed.ref} · EAN: ${p.parsed.ean} · Contexte source: ${p.parsed.contexte}</div>
+      ${superuMinSizeWarningHtml(p)}
+      ${
+        p.contenu === "?"
+          ? `<div class="lookup-status not-found">Contexte source sans correspondance directe — choisis le contenu ci-dessous</div>`
+          : ""
+      }
+      <div class="fields">
+        <label>Face
+          <select class="su-face">${optionsHtml(window.SUPERU_FACE_LABELS, p.face)}</select>
+        </label>
+        <label>Angle horizontal
+          <select class="su-angle-h">${optionsHtml(window.SUPERU_ANGLE_H_LABELS, p.angle_h)}</select>
+        </label>
+        <label>Contenu
+          <select class="su-contenu">${superuContenuOptionsHtml(p)}</select>
+        </label>
+        <label>Fabricant (optionnel)
+          <input type="text" class="su-fab" value="${p.fab || ""}" placeholder="ex: usinor">
+        </label>
+      </div>
+      <div class="preview-name">${superuFilenamePreview(p)}</div>
+    </div>
+    <button class="remove-btn" title="Supprimer cette photo">&times;</button>
+  </div>`;
+}
+
+function wireSuperuCards() {
+  superuListEl.querySelectorAll(".photo-card").forEach((card) => {
+    const id = card.dataset.id;
+    const photo = superuPhotos.find((p) => p.temp_id === id);
+    card.querySelector(".remove-btn").addEventListener("click", () => removeSuperuPhoto(id));
+
+    if (!photo.parsed) return;
+
+    const previewEl = card.querySelector(".preview-name");
+    card.querySelector(".su-face").addEventListener("change", (e) => {
+      photo.face = e.target.value;
+      previewEl.textContent = superuFilenamePreview(photo);
+    });
+    card.querySelector(".su-angle-h").addEventListener("change", (e) => {
+      photo.angle_h = e.target.value;
+      previewEl.textContent = superuFilenamePreview(photo);
+    });
+    card.querySelector(".su-contenu").addEventListener("change", (e) => {
+      photo.contenu = e.target.value;
+      renderSuperu();
+    });
+    card.querySelector(".su-fab").addEventListener("input", (e) => {
+      photo.fab = e.target.value.trim();
+      previewEl.textContent = superuFilenamePreview(photo);
+    });
+  });
+}
+
+function renderSuperu() {
+  superuActionsEl.classList.toggle("hidden", superuPhotos.length === 0);
+  superuListEl.innerHTML = superuPhotos.map(superuCardHtml).join("");
+  wireSuperuCards();
+}
+
+superuProcessBtn.addEventListener("click", async () => {
+  if (!superuDestFolder) {
+    alert("Choisis d'abord un dossier de sortie.");
+    return;
+  }
+
+  const unresolved = superuPhotos.filter((p) => p.parsed && p.contenu === "?");
+  if (unresolved.length) {
+    alert(
+      `${unresolved.length} photo(s) attendent un choix de contenu (Nu/déballé, Préparé, Emballé ou Mise en situation) avant de pouvoir traiter.`
+    );
+    return;
+  }
+
+  const unparsed = superuPhotos.filter((p) => !p.parsed);
+  const parsed = superuPhotos.filter((p) => p.parsed);
+
+  const preResults = unparsed.map((p) => ({
+    temp_id: p.temp_id,
+    error: "Nom de fichier non reconnu (convention Add-One requise)",
+  }));
+
+  const items = parsed.map((p) => ({
+    temp_id: p.temp_id,
+    ean: p.parsed.ean,
+    face: p.face,
+    angle_h: p.angle_h,
+    contenu: p.contenu,
+    fab: p.fab,
+  }));
+
+  superuProcessBtn.disabled = true;
+  superuProcessBtn.textContent = "Traitement en cours...";
+
+  let results = preResults;
+  if (items.length) {
+    try {
+      const res = await fetch("/api/superu/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, dest_folder: superuDestFolder }),
+      });
+      if (!res.ok) throw new Error(`Erreur serveur (${res.status})`);
+      const serverResults = await res.json();
+      results = preResults.concat(serverResults);
+    } catch (err) {
+      superuResultListEl.innerHTML = `<div class="result-banner error">Le traitement a échoué : ${err.message}</div>`;
+      superuProcessBtn.disabled = false;
+      superuProcessBtn.textContent = "Traiter et renommer";
+      return;
+    }
+  }
+
+  const successCount = results.filter((r) => !r.error).length;
+  const errorCount = results.length - successCount;
+
+  let banner;
+  if (errorCount === 0) {
+    banner = `<div class="result-banner success">${successCount} photo${successCount > 1 ? "s" : ""} traitée${successCount > 1 ? "s" : ""} avec succès</div>`;
+  } else if (successCount === 0) {
+    banner = `<div class="result-banner error">Échec du traitement : ${errorCount} erreur${errorCount > 1 ? "s" : ""}</div>`;
+  } else {
+    banner = `<div class="result-banner warning">${successCount} photo${successCount > 1 ? "s" : ""} traitée${successCount > 1 ? "s" : ""}, ${errorCount} erreur${errorCount > 1 ? "s" : ""}</div>`;
+  }
+
+  superuResultListEl.innerHTML =
+    banner +
+    results
+      .map((r) =>
+        r.error
+          ? `<div class="result-row error">Erreur (${r.temp_id}) : ${r.error}</div>`
+          : `<div class="result-row"><span>${r.path}</span><span>${r.size_kb} Ko</span></div>`
+      )
+      .join("");
+
+  superuPhotos = [];
+  superuListEl.innerHTML = "";
+  superuActionsEl.classList.add("hidden");
+  superuProcessBtn.disabled = false;
+  superuProcessBtn.textContent = "Traiter et renommer";
+  superuFileInput.value = "";
+});

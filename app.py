@@ -1,4 +1,5 @@
 import os
+import shutil
 import uuid
 
 from dotenv import load_dotenv
@@ -6,6 +7,7 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 
 import carrefour
 import quable
+import superu
 from core import (
     ANGLE_LABELS,
     CONTEXTE_LABELS,
@@ -40,6 +42,9 @@ def index():
         type_labels=TYPE_LABELS,
         carrefour_angle_labels=carrefour.ANGLE_LABELS,
         carrefour_nature_labels=carrefour.NATURE_LABELS,
+        superu_face_labels=superu.FACE_LABELS,
+        superu_angle_h_labels=superu.HORIZONTAL_ANGLE_LABELS,
+        superu_contenu_labels=superu.CONTENU_LABELS,
     )
 
 
@@ -297,6 +302,114 @@ def api_carrefour_process():
         finally:
             if os.path.isfile(item["src_path"]):
                 os.remove(item["src_path"])
+
+    return jsonify(results)
+
+
+@app.route("/api/superu/upload", methods=["POST"])
+def api_superu_upload():
+    files = request.files.getlist("photos")
+    results = []
+
+    for f in files:
+        temp_id = f"{uuid.uuid4().hex}{os.path.splitext(f.filename)[1]}"
+        temp_path = os.path.join(UPLOAD_DIR, temp_id)
+        f.save(temp_path)
+
+        parsed = carrefour.parse_addone_filename(f.filename)
+        suggested = superu.suggest_superu_fields(parsed) if parsed else None
+        width, height = get_image_size(temp_path)
+
+        results.append(
+            {
+                "temp_id": temp_id,
+                "original_name": f.filename,
+                "preview_url": f"/uploads/{temp_id}",
+                "parsed": parsed,
+                "suggested": suggested,
+                "width": width,
+                "height": height,
+                "below_min_size": superu.is_below_min_size(width, height),
+            }
+        )
+
+    return jsonify(results)
+
+
+@app.route("/api/superu/process", methods=["POST"])
+def api_superu_process():
+    payload = request.get_json(force=True)
+    items = payload.get("items", [])
+    dest_dir = str(payload.get("dest_folder", "")).strip()
+    results = []
+
+    if not dest_dir or not os.path.isdir(dest_dir):
+        return jsonify(
+            [{"temp_id": item.get("temp_id"), "error": "Dossier de destination invalide ou non choisi"} for item in items]
+        )
+
+    for item in items:
+        temp_id = item["temp_id"]
+        ean = str(item["ean"]).strip()
+        face = str(item["face"]).strip()
+        angle_h = str(item["angle_h"]).strip().upper()
+        contenu = str(item.get("contenu", "")).strip()
+        fab = str(item.get("fab", "")).strip()
+
+        src_path = os.path.join(UPLOAD_DIR, temp_id)
+
+        if not is_valid_ean(ean):
+            results.append(
+                {"temp_id": temp_id, "error": f"EAN invalide : \"{ean}\" doit contenir exactement 13 chiffres"}
+            )
+            if os.path.isfile(src_path):
+                os.remove(src_path)
+            continue
+
+        if not superu.is_valid_face(face):
+            results.append({"temp_id": temp_id, "error": f"Face invalide : \"{face}\""})
+            if os.path.isfile(src_path):
+                os.remove(src_path)
+            continue
+
+        if not superu.is_valid_angle_h(angle_h):
+            results.append({"temp_id": temp_id, "error": f"Angle horizontal invalide : \"{angle_h}\""})
+            if os.path.isfile(src_path):
+                os.remove(src_path)
+            continue
+
+        if not superu.is_valid_contenu(contenu):
+            results.append({"temp_id": temp_id, "error": f"Contenu invalide : \"{contenu}\""})
+            if os.path.isfile(src_path):
+                os.remove(src_path)
+            continue
+
+        if not os.path.isfile(src_path):
+            results.append({"temp_id": temp_id, "error": "fichier introuvable"})
+            continue
+
+        filename = superu.next_available_filename(dest_dir, ean, face, angle_h, contenu, fab)
+        dest_path = os.path.join(dest_dir, filename)
+
+        try:
+            # Le cahier des charges Super U n'exige ni carre ni recadrage
+            # (juste >=1500px sur un cote et <=50 Mo) : la source vient deja
+            # de notre propre export Add-One (3000x3000, <=1 Mo), donc on
+            # copie telle quelle plutot que de la retraiter.
+            shutil.copyfile(src_path, dest_path)
+            results.append(
+                {
+                    "temp_id": temp_id,
+                    "filename": filename,
+                    "path": dest_path,
+                    "size_kb": round(os.path.getsize(dest_path) / 1024, 1),
+                }
+            )
+        except Exception as exc:
+            results.append({"temp_id": temp_id, "error": str(exc)})
+        finally:
+            if os.path.isfile(src_path):
+                os.remove(src_path)
 
     return jsonify(results)
 

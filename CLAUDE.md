@@ -102,7 +102,7 @@ Statut : **fait**, source primaire pour l'auto-remplissage EAN/Type (voir flux m
 
 ## Flux "Carrefour"
 
-L'interface a trois onglets en haut (avec logos) : **PIM Quable** (flux décrit ci-dessus — le nommage "Add-One" sert en réalité à l'import dans le PIM Quable, d'où le logo Quable sur cet onglet et non le logo Add-One), **Carrefour** (règles de nommage spécifiques à cette enseigne) et **Super U** (onglet préparé mais en attente des règles de nommage — voir section dédiée ci-dessous). Le gros logo Add-One en haut de page est celui de la société elle-même (identité de l'outil), pas celui d'un onglet en particulier. Statut Carrefour : **fait**.
+L'interface a trois onglets en haut (avec logos) : **PIM Quable** (flux décrit ci-dessus — le nommage "Add-One" sert en réalité à l'import dans le PIM Quable, d'où le logo Quable sur cet onglet et non le logo Add-One), **Carrefour** et **Super U** (règles de nommage spécifiques à chaque enseigne, voir sections dédiées). Le gros logo Add-One en haut de page est celui de la société elle-même (identité de l'outil), pas celui d'un onglet en particulier. Statut : **fait** pour les trois.
 
 **Principe** : contrairement au flux Add-One, l'entrée du flux Carrefour est constituée de photos **déjà renommées selon la convention Add-One** (ex: `710306_3601029899278_P_H1S_P_S01_2023_I.jpg`). L'app parse ce nom pour en extraire EAN/Angle/Contexte, puis suggère automatiquement les champs équivalents côté Carrefour (modifiables avant traitement).
 
@@ -140,24 +140,58 @@ Format : `{EAN}_{Angle}_{Nature}_{Doublon}_{i}.jpg` — **chaque segment optionn
 - Module `carrefour.py` : `parse_addone_filename`, `suggest_carrefour_fields`, `build_filename`, `assign_doublons` (regroupe les items d'un même lot par EAN+Angle+Nature et numérote les doublons).
 - Routes Flask : `GET /api/browse-folder` (sélecteur de dossier natif), `POST /api/carrefour/upload`, `POST /api/carrefour/process`.
 
-## Flux "Super U" (en préparation)
+## Flux "Super U"
 
-Un onglet existe dans l'interface (avec son logo `static/logo-superu.png`) mais affiche uniquement un message "Règles de nommage à venir" (`.coming-soon` dans `templates/index.html`/`style.css`) — **aucune logique de renommage/traitement n'est encore implémentée**. Statut : **en attente des règles de nommage de Teddy**. Une fois les règles fournies, s'inspirer de l'architecture du flux Carrefour (`carrefour.py`, routes `/api/carrefour/*`) pour construire les modules équivalents plutôt que de tout redévelopper depuis zéro.
+Statut : **fait**. Source du cahier des charges : `CAHIER DES CHARGES POUR LA DÉPOSE DES MÉDIAS.pdf` (portail fournisseurs U Multimédias, section "Visuels produits unitaires").
+
+**Principe** : comme pour Carrefour, l'entrée est constituée de photos **déjà renommées selon la convention Add-One** (ex: `710306_3601029899278_P_H1S_P_S01_2023_I.jpg`). L'app parse ce nom et suggère les champs équivalents côté Super U.
+
+### Convention de sortie Super U
+
+Format : `{EAN14}_C{Face}{AngleH}{Contenu}_s{NN}[_FAB_{fabricant}]`. Exemple : `03601029899278_C1N1_s01.jpg`.
+
+| Segment | Détail |
+|---|---|
+| `EAN14` | **Important (précision de Teddy)** : ne pas chercher un "vrai" EAN 14 séparé — c'est notre EAN 13 habituel (repris du nom Add-One source), complété à gauche par un `0` pour obtenir 14 caractères (`superu.to_ean14`). Conforme au cahier des charges ("EAN sur 14 caractères, complété à gauche par des 0"). |
+| `C` | Nature du fichier — toujours "Haute Définition", fixe (nos exports sont toujours ≥1500px). |
+| `Face` | Principale face du produit (GS1) : `0`=Autre angle/zoom, `1`=Face, `2`=Côté gauche, `3`=Dessus, `7`=Dos, `8`=Côté droit, `9`=Dessous. Mêmes assignations de chiffres que les codes Carrefour (`carrefour.ANGLE_TO_CARREFOUR`), reprises indépendamment dans `superu.ANGLE_TO_FACE`. |
+| `AngleH` | Angle de prise de vue horizontal — **champ entièrement nouveau, absent du nommage Add-One** : `L`=3/4 gauche, `C`=Centre avec angle de plongée 15°, `N`=Centre sans angle de plongée, `R`=3/4 droit. Pré-rempli à `N` par défaut (décision de Teddy), toujours modifiable manuellement par photo. |
+| `Contenu` | `0`=Nu/déballé, `1`=Emballé/packshot, `D`=Préparé (monté), `G`=Mis en situation. |
+| `sNN` | Numéro séquentiel (01-99), calculé en scannant le dossier de destination réel pour la même combinaison EAN+Face+AngleH+Contenu (`superu.next_sequence_number` — même logique que la séquence Add-One, **pas** le système de doublon X-sur-Y de Carrefour). |
+| `_FAB_{fabricant}` | Optionnel — champ texte libre, ajouté seulement si rempli (variante liée à un fabricant). |
+
+### Correspondance Add-One → Super U (validée par Teddy)
+
+**Contexte P** → Contenu `1` (Emballé/packshot). **Contexte M** → Contenu `G` (Mis en situation). Ces deux sont sans ambiguïté.
+
+**Contexte N** (regroupe "nu" et "préparé" côté Add-One) → Contenu par défaut `0` (Nu/déballé), **modifiable manuellement** vers `D` (Préparé/monté) si besoin — décision de Teddy (pas de blocage, juste une valeur par défaut à corriger au cas par cas).
+
+**Contexte T** (Produit + Texte/infographie) → **aucun équivalent Super U** (pas de case "info visible" comme chez Carrefour). Décision de Teddy : **choix manuel obligatoire** — le champ Contenu affiche un placeholder "-- Choisir le contenu --" et le traitement est bloqué (message d'alerte) tant que l'utilisateur n'a pas choisi manuellement pour chaque photo concernée. Le contexte legacy **Q** (cf. "Flux studio") suit la même règle (choix manuel obligatoire), pour la même raison que côté Carrefour : ambigu, pas de défaut fiable.
+
+### Interface et traitement
+
+- Un bouton **"Choisir le dossier de sortie"** ouvre le sélecteur natif (même route `/api/browse-folder` que Carrefour) — pas de dossier fixe/imposé.
+- **Pas de recadrage ni de redimensionnement** : contrairement à Add-One/Carrefour, le cahier des charges Super U n'exige pas de carré 3000x3000, seulement un minimum de 1500px sur au moins un côté et un poids ≤ 50 Mo. Comme la source est déjà notre propre export Add-One (3000x3000, ≤ 1 Mo), l'app se contente de **copier le fichier tel quel** (`shutil.copyfile`, pas de `save_as_compressed_jpg`) sous le nouveau nom — aucune perte de qualité, aucun recadrage qui pourrait couper le produit.
+- **Alerte résolution insuffisante** : avertissement spécifique (`superu.is_below_min_size`, seuil **1500px**, pas 3000 comme pour Add-One/Carrefour) si ni la largeur ni la hauteur n'atteignent 1500px — la formulation précise qu'aucun agrandissement n'aura lieu (contrairement à l'alerte Add-One/Carrefour) et que le fichier serait refusé par le portail U Multimédias.
+- Module `superu.py` : `suggest_superu_fields`, `build_filename`, `next_sequence_number`/`next_available_filename`, `to_ean14`, `is_below_min_size`. Réutilise `carrefour.parse_addone_filename` (même source, pas de duplication du parsing).
+- Routes Flask : `POST /api/superu/upload`, `POST /api/superu/process`.
+- Hors périmètre pour l'instant : les conventions Super U pour les **documents** (`DOC_{EAN14}_{type}`, ex. notices) et les **logos** (`LOGO_{nom}`) décrites dans le même cahier des charges — seul le flux "visuels produits unitaires" a été implémenté.
 
 ## Architecture technique
 
 - **Stack** : Python 3.12 + Flask + Pillow, interface web locale (HTML/CSS/JS vanilla)
-- `app.py` — routes Flask (`/`, `/api/upload`, `/api/lookup-ref/<ref>`, `/api/photo/<temp_id>` DELETE, `/api/process`, `/api/browse-folder`, `/api/carrefour/upload`, `/api/carrefour/process`)
+- `app.py` — routes Flask (`/`, `/api/upload`, `/api/lookup-ref/<ref>`, `/api/photo/<temp_id>` DELETE, `/api/process`, `/api/browse-folder`, `/api/carrefour/upload`, `/api/carrefour/process`, `/api/superu/upload`, `/api/superu/process`)
 - `core.py` — logique métier Add-One : parsing du nom studio, génération du nom final, compression JPEG, calcul du numéro de séquence, lecture des variantes existantes dans `Z:\Photos`
 - `quable.py` — appels à l'API Quable (voir section dédiée ci-dessus)
 - `carrefour.py` — logique métier Carrefour (voir section dédiée ci-dessus)
-- `templates/index.html` — page principale (onglets Add-One / Carrefour)
+- `superu.py` — logique métier Super U (voir section dédiée ci-dessus)
+- `templates/index.html` — page principale (onglets PIM Quable / Carrefour / Super U)
 - `static/app.js`, `static/style.css` — logique front (drag & drop, formulaires, aperçus) et style
 - `static/logo-addone.png` — gros logo Add-One affiché dans l'en-tête de la page ; `static/logo-quable.png`, `static/logo-carrefour.svg`, `static/logo-superu.png` — logos affichés dans les onglets (PIM Quable / Carrefour / Super U)
 - `uploads/` — stockage temporaire des photos importées avant traitement
 - `.env` (non commité, voir `.env.example`) — `QUABLE_API_TOKEN`, `QUABLE_BASE_URL`
 - **Sortie Add-One : `Z:\Photos\{Référence}\`** — les photos renommées/compressées sont écrites directement dans le lecteur réseau, dans le sous-dossier de la référence produit. Si le dossier référence existe déjà, les photos y sont ajoutées (numéro de séquence recalculé pour ne jamais écraser un fichier existant). S'il n'existe pas, il est créé automatiquement (nom = référence seule).
-- **Sortie Carrefour : dossier choisi par l'utilisateur** via le sélecteur natif, pas de structure imposée.
+- **Sortie Carrefour / Super U : dossier choisi par l'utilisateur** via le sélecteur natif, pas de structure imposée.
 
 ### Lancer l'application
 

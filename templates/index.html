@@ -95,11 +95,31 @@
   </div>
 
   <div id="superuView" class="site-view hidden">
-    <div class="coming-soon">
-      <img class="coming-soon-logo" src="{{ url_for('static', filename='logo-superu.png') }}" alt="Logo Super U">
-      <h2>Règles de nommage Super U à venir</h2>
-      <p class="hint">Cet onglet sera activé dès que les règles de nommage spécifiques à Super U auront été communiquées.</p>
+    <p class="hint">Glisse des photos déjà nommées selon la convention Add-One (ex: <code>710306_3601029899278_P_H1S_P_S01_2023_I.jpg</code>) — Face/Contenu sont pré-remplis automatiquement à partir du nom, à vérifier avant traitement. L'EAN est repris tel quel (13 chiffres) et complété à gauche par un 0 pour former l'EAN 14 attendu par Super U. Le numéro de séquence (s••) est calculé automatiquement au traitement.</p>
+
+    <div id="superuDropzone" class="dropzone">
+      <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M7 18C4.79 18 3 16.21 3 14C3 12.02 4.44 10.37 6.34 10.05C6.75 7.19 9.22 5 12.2 5C15.19 5 17.65 7.19 18.06 10.05C19.95 10.37 21.4 12.02 21.4 14C21.4 16.21 19.61 18 17.4 18H7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M12 20V12M12 12L9.2 14.8M12 12L14.8 14.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <p>Glisse tes photos ici, ou clique pour en choisir</p>
+      <input type="file" id="superuFileInput" multiple accept="image/*" hidden>
     </div>
+
+    <div id="superuList" class="photo-list"></div>
+
+    <div id="superuActions" class="actions hidden">
+      <div class="dest-folder-row">
+        <button id="superuChooseFolderBtn" class="secondary">Choisir le dossier de sortie</button>
+        <span id="superuDestFolderPath" class="dest-folder-path">Aucun dossier choisi</span>
+      </div>
+      <div class="actions-buttons">
+        <button id="superuResetBtn" class="secondary">Réinitialiser</button>
+        <button id="superuProcessBtn">Traiter et renommer</button>
+      </div>
+    </div>
+
+    <section id="superuResultList" class="result-list"></section>
   </div>
 </div>
 
@@ -109,6 +129,9 @@
   window.TYPE_LABELS = {{ type_labels | tojson }};
   window.CARREFOUR_ANGLE_LABELS = {{ carrefour_angle_labels | tojson }};
   window.CARREFOUR_NATURE_LABELS = {{ carrefour_nature_labels | tojson }};
+  window.SUPERU_FACE_LABELS = {{ superu_face_labels | tojson }};
+  window.SUPERU_ANGLE_H_LABELS = {{ superu_angle_h_labels | tojson }};
+  window.SUPERU_CONTENU_LABELS = {{ superu_contenu_labels | tojson }};
 </script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
