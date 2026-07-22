@@ -671,6 +671,7 @@ const carrefourResetBtn = document.getElementById("carrefourResetBtn");
 const carrefourResultListEl = document.getElementById("carrefourResultList");
 const chooseFolderBtn = document.getElementById("chooseFolderBtn");
 const destFolderPathEl = document.getElementById("destFolderPath");
+const carrefourResetFolderBtn = document.getElementById("carrefourResetFolderBtn");
 
 let carrefourPhotos = [];
 let destFolder = null;
@@ -687,11 +688,18 @@ chooseFolderBtn.addEventListener("click", async () => {
       destFolder = data.path;
       destFolderPathEl.textContent = destFolder;
       destFolderPathEl.classList.remove("not-found");
+      carrefourResetFolderBtn.classList.remove("hidden");
     }
   } finally {
     chooseFolderBtn.disabled = false;
-    chooseFolderBtn.textContent = "Choisir le dossier de sortie";
+    chooseFolderBtn.textContent = "Choisir un autre dossier";
   }
+});
+
+carrefourResetFolderBtn.addEventListener("click", () => {
+  destFolder = null;
+  destFolderPathEl.textContent = "Dossier par défaut (Z:\\Photo Carrefour)";
+  carrefourResetFolderBtn.classList.add("hidden");
 });
 
 carrefourDropzone.addEventListener("click", () => carrefourFileInput.click());
@@ -844,11 +852,6 @@ function renderCarrefour() {
 }
 
 carrefourProcessBtn.addEventListener("click", async () => {
-  if (!destFolder) {
-    alert("Choisis d'abord un dossier de sortie.");
-    return;
-  }
-
   const unresolved = carrefourPhotos.filter((p) => p.parsed && p.nature === "?");
   if (unresolved.length) {
     alert(
@@ -936,6 +939,7 @@ const superuResetBtn = document.getElementById("superuResetBtn");
 const superuResultListEl = document.getElementById("superuResultList");
 const superuChooseFolderBtn = document.getElementById("superuChooseFolderBtn");
 const superuDestFolderPathEl = document.getElementById("superuDestFolderPath");
+const superuResetFolderBtn = document.getElementById("superuResetFolderBtn");
 
 let superuPhotos = [];
 let superuDestFolder = null;
@@ -952,11 +956,18 @@ superuChooseFolderBtn.addEventListener("click", async () => {
       superuDestFolder = data.path;
       superuDestFolderPathEl.textContent = superuDestFolder;
       superuDestFolderPathEl.classList.remove("not-found");
+      superuResetFolderBtn.classList.remove("hidden");
     }
   } finally {
     superuChooseFolderBtn.disabled = false;
-    superuChooseFolderBtn.textContent = "Choisir le dossier de sortie";
+    superuChooseFolderBtn.textContent = "Choisir un autre dossier";
   }
+});
+
+superuResetFolderBtn.addEventListener("click", () => {
+  superuDestFolder = null;
+  superuDestFolderPathEl.textContent = "Dossier par défaut (Z:\\Photo Super U)";
+  superuResetFolderBtn.classList.add("hidden");
 });
 
 superuDropzone.addEventListener("click", () => superuFileInput.click());
@@ -1114,11 +1125,6 @@ function renderSuperu() {
 }
 
 superuProcessBtn.addEventListener("click", async () => {
-  if (!superuDestFolder) {
-    alert("Choisis d'abord un dossier de sortie.");
-    return;
-  }
-
   const unresolved = superuPhotos.filter((p) => p.parsed && p.contenu === "?");
   if (unresolved.length) {
     alert(

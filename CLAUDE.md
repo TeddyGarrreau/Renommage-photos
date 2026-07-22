@@ -130,7 +130,7 @@ Format : `{EAN}_{Angle}_{Nature}_{Doublon}_{i}.jpg` — **chaque segment optionn
 
 ### Interface et traitement
 
-- Un bouton **"Choisir le dossier de sortie"** ouvre un sélecteur de dossier natif Windows (via `tkinter.filedialog`, exécuté côté serveur puisque l'app tourne en local sur le même poste) — pas de dossier de sortie fixe/imposé comme pour Add-One.
+- **Dossier par défaut : `Z:\Photo Carrefour\`** (dossier plat, pas de sous-dossier par référence — cohérent avec le fait que le nom de fichier contient déjà l'EAN). Comme pour Add-One, un bouton **"Choisir un autre dossier"** permet de rediriger ponctuellement vers un autre dossier via le sélecteur natif Windows (`tkinter.filedialog`, exécuté côté serveur), avec un lien "Revenir au dossier par défaut" pour annuler ce choix. Ce changement (dossier par défaut au lieu d'un choix obligatoire à chaque fois) a été fait pour permettre un usage multi-utilisateur depuis plusieurs postes différents une fois l'app hébergée sur un poste partagé (ex. serveur ORBITVU) : le sélecteur natif s'ouvre côté serveur et serait invisible pour un collègue sur un autre poste, donc il ne doit plus être obligatoire.
 - Chaque photo déposée est parsée automatiquement (`carrefour.parse_addone_filename`) ; si le nom ne correspond pas à la convention Add-One, la photo est rejetée avec un message clair (pas de traitement possible).
 - Champs Angle/Nature/case "Info produit visible" pré-remplis automatiquement mais éditables par photo avant traitement.
 - Mêmes contraintes fichier que Add-One (JPG, 3000x3000px, max 1 Mo, `core.save_as_compressed_jpg`), **sauf le mode de redimensionnement** qui dépend de la Nature :
@@ -170,7 +170,7 @@ Format : `{EAN14}_C{Face}{AngleH}{Contenu}_s{NN}[_FAB_{fabricant}]`. Exemple : `
 
 ### Interface et traitement
 
-- Un bouton **"Choisir le dossier de sortie"** ouvre le sélecteur natif (même route `/api/browse-folder` que Carrefour) — pas de dossier fixe/imposé.
+- **Dossier par défaut : `Z:\Photo Super U\`** (dossier plat, même logique et même raison que côté Carrefour ci-dessus). Bouton **"Choisir un autre dossier"** + lien "Revenir au dossier par défaut" pour rediriger ponctuellement (même sélecteur natif, route `/api/browse-folder`).
 - **Pas de recadrage ni de redimensionnement** : contrairement à Add-One/Carrefour, le cahier des charges Super U n'exige pas de carré 3000x3000, seulement un minimum de 1500px sur au moins un côté et un poids ≤ 50 Mo. Comme la source est déjà notre propre export Add-One (3000x3000, ≤ 1 Mo), l'app se contente de **copier le fichier tel quel** (`shutil.copyfile`, pas de `save_as_compressed_jpg`) sous le nouveau nom — aucune perte de qualité, aucun recadrage qui pourrait couper le produit.
 - **Alerte résolution insuffisante** : avertissement spécifique (`superu.is_below_min_size`, seuil **1500px**, pas 3000 comme pour Add-One/Carrefour) si ni la largeur ni la hauteur n'atteignent 1500px — la formulation précise qu'aucun agrandissement n'aura lieu (contrairement à l'alerte Add-One/Carrefour) et que le fichier serait refusé par le portail U Multimédias.
 - Module `superu.py` : `suggest_superu_fields`, `build_filename`, `next_sequence_number`/`next_available_filename`, `to_ean14`, `is_below_min_size`. Réutilise `carrefour.parse_addone_filename` (même source, pas de duplication du parsing).
@@ -191,19 +191,22 @@ Format : `{EAN14}_C{Face}{AngleH}{Contenu}_s{NN}[_FAB_{fabricant}]`. Exemple : `
 - `uploads/` — stockage temporaire des photos importées avant traitement
 - `.env` (non commité, voir `.env.example`) — `QUABLE_API_TOKEN`, `QUABLE_BASE_URL`
 - **Sortie Add-One : `Z:\Photos\{Référence}\`** — les photos renommées/compressées sont écrites directement dans le lecteur réseau, dans le sous-dossier de la référence produit. Si le dossier référence existe déjà, les photos y sont ajoutées (numéro de séquence recalculé pour ne jamais écraser un fichier existant). S'il n'existe pas, il est créé automatiquement (nom = référence seule).
-- **Sortie Carrefour / Super U : dossier choisi par l'utilisateur** via le sélecteur natif, pas de structure imposée.
+- **Sortie Carrefour : `Z:\Photo Carrefour\`** — **Sortie Super U : `Z:\Photo Super U\`** — dossiers plats par défaut (redirigeables ponctuellement via le sélecteur natif, voir sections dédiées).
 
 ### Lancer l'application
 
-```
-cd photo-renamer
-python app.py
-```
-
 Servi par **waitress** (pas le serveur de dev Flask/mode debug — évite le débogueur Werkzeug qui permet l'exécution de code à distance), écoute sur `0.0.0.0:5000`.
 
-Puis ouvrir `http://localhost:5000` (en local) ou `http://<IP locale>:5000` (depuis un autre poste du réseau).
+**Démarrage automatique** : un script `Renommage Photos - serveur.vbs` est déposé dans le dossier Démarrage de Windows (`shell:startup`, soit `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`). Il lance `pythonw.exe app.py` (variante sans console de Python) de façon totalement silencieuse à chaque ouverture de session Windows — aucune fenêtre visible, aucune action manuelle requise. Créé via un `.vbs` plutôt qu'un raccourci `.lnk` classique car la création de raccourci par COM (`WScript.Shell`) est bloquée par le sandbox de l'environnement de dev ; le `.vbs` lui-même exécute ce même COM mais dans son propre processus `wscript.exe` au moment du login, donc sans ce problème.
 
-### Partage réseau avec des collègues
+**Raccourci Bureau** : `Renommage Photos.url` sur le Bureau — ouvre simplement `http://localhost:5000` dans le navigateur par défaut (le serveur tourne déjà en fond via le démarrage automatique, ce raccourci n'en lance pas un nouveau).
 
-En pause : le profil réseau Windows de la machine est **"Public"** et une règle de pare-feu bloque déjà les connexions entrantes vers `python.exe`. Teddy doit régler ça lui-même (ou via l'IT) avant que le partage LAN fonctionne — ce n'est pas quelque chose que l'assistant modifie directement (réglages pare-feu/sécurité système). Le code est déjà prêt côté appli (waitress, pas de debug, `0.0.0.0`).
+**Lancement manuel** (debug, ou si besoin de voir les logs dans une console) : `start_app.bat` à la racine du projet — ouvre une fenêtre de console visible avec `python.exe app.py`, puis ouvre le navigateur. À ne pas utiliser en complément du démarrage automatique silencieux (les deux tenteraient d'écouter sur le port 5000 en même temps → erreur).
+
+### Partage multi-utilisateur : abandonné
+
+Deux pistes explorées puis abandonnées faute de droits suffisants :
+1. Héberger sur le poste **ORBITVU** (`\\DESKTOP-7DKB60I`) — bloqué : impossible d'installer Python sur cette machine (poste verrouillé/restreint par l'IT).
+2. Héberger sur le PC de Teddy (`ADDONE-26-18`) et ouvrir le port 5000 aux autres postes du LAN — bloqué : Teddy n'a pas les droits admin nécessaires pour modifier le pare-feu Windows, et l'IT externe gère ces droits.
+
+**Décision finale de Teddy** : l'outil reste à usage personnel, lancé en local sur son propre PC (`python app.py`, accès via `http://localhost:5000` uniquement, pas de partage réseau). Les dossiers de sortie par défaut Carrefour/Super U (`Z:\Photo Carrefour`, `Z:\Photo Super U`, voir sections dédiées) restent en place tels quels : même en usage solo, ils évitent d'avoir à choisir un dossier à chaque traitement.

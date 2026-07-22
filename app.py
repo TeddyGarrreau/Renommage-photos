@@ -27,6 +27,8 @@ load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 PHOTOS_ROOT = r"Z:\Photos"
+CARREFOUR_DEFAULT_DIR = r"Z:\Photo Carrefour"
+SUPERU_DEFAULT_DIR = r"Z:\Photo Super U"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -234,13 +236,10 @@ def api_carrefour_upload():
 def api_carrefour_process():
     payload = request.get_json(force=True)
     items = payload.get("items", [])
-    dest_dir = str(payload.get("dest_folder", "")).strip()
+    custom_dest = str(payload.get("dest_folder") or "").strip()
+    dest_dir = custom_dest if custom_dest else CARREFOUR_DEFAULT_DIR
+    os.makedirs(dest_dir, exist_ok=True)
     results = []
-
-    if not dest_dir or not os.path.isdir(dest_dir):
-        return jsonify(
-            [{"temp_id": item.get("temp_id"), "error": "Dossier de destination invalide ou non choisi"} for item in items]
-        )
 
     valid_items = []
     for item in items:
@@ -340,13 +339,10 @@ def api_superu_upload():
 def api_superu_process():
     payload = request.get_json(force=True)
     items = payload.get("items", [])
-    dest_dir = str(payload.get("dest_folder", "")).strip()
+    custom_dest = str(payload.get("dest_folder") or "").strip()
+    dest_dir = custom_dest if custom_dest else SUPERU_DEFAULT_DIR
+    os.makedirs(dest_dir, exist_ok=True)
     results = []
-
-    if not dest_dir or not os.path.isdir(dest_dir):
-        return jsonify(
-            [{"temp_id": item.get("temp_id"), "error": "Dossier de destination invalide ou non choisi"} for item in items]
-        )
 
     for item in items:
         temp_id = item["temp_id"]
