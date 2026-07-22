@@ -7,27 +7,30 @@
 </head>
 <body>
 <div class="wrap">
-  <header class="app-header">
-    <img class="app-logo" src="{{ url_for('static', filename='logo-addone.png') }}" alt="Logo Add-One">
-    <div>
-      <h1>Renommage automatique de photos</h1>
-      <p class="app-subtitle">Prépare et exporte tes visuels produits pour le PIM Quable et pour Carrefour</p>
-    </div>
-  </header>
+  <div class="topbar">
+    <header class="app-header">
+      <img class="app-logo" src="{{ url_for('static', filename='logo-addone.png') }}" alt="Logo Add-One">
+      <div class="app-header-divider"></div>
+      <div>
+        <h1>Renommage automatique de photos</h1>
+        <p class="app-subtitle">Prépare et exporte tes visuels produits pour le PIM Quable et pour Carrefour</p>
+      </div>
+    </header>
 
-  <div class="site-tabs">
-    <button class="site-tab active" data-site="addone">
-      <img class="site-tab-logo" src="{{ url_for('static', filename='logo-quable.png') }}" alt="Logo PIM Quable">
-      <span>PIM Quable</span>
-    </button>
-    <button class="site-tab" data-site="carrefour">
-      <img class="site-tab-logo" src="{{ url_for('static', filename='logo-carrefour.svg') }}" alt="Logo Carrefour">
-      <span>Carrefour</span>
-    </button>
-    <button class="site-tab" data-site="superu">
-      <img class="site-tab-logo" src="{{ url_for('static', filename='logo-superu.png') }}" alt="Logo Super U">
-      <span>Super U</span>
-    </button>
+    <div class="site-tabs">
+      <button class="site-tab active" data-site="addone">
+        <img class="site-tab-logo" src="{{ url_for('static', filename='logo-quable.png') }}" alt="Logo PIM Quable">
+        <span>PIM Quable</span>
+      </button>
+      <button class="site-tab" data-site="carrefour">
+        <img class="site-tab-logo" src="{{ url_for('static', filename='logo-carrefour.svg') }}" alt="Logo Carrefour">
+        <span>Carrefour</span>
+      </button>
+      <button class="site-tab" data-site="superu">
+        <img class="site-tab-logo" src="{{ url_for('static', filename='logo-superu.png') }}" alt="Logo Super U">
+        <span>Super U</span>
+      </button>
+    </div>
   </div>
 
   <div id="addoneView" class="site-view">

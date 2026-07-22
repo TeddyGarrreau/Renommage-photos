@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
 * { box-sizing: border-box; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -57,29 +59,47 @@ body {
 
 /* --- Header --- */
 
+.topbar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 28px;
+  overflow: hidden;
+}
+
 .app-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: 18px;
+  padding: 22px 26px;
+}
+
+.app-header-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  flex-shrink: 0;
 }
 
 .app-logo {
-  height: 60px;
+  height: 52px;
   width: auto;
-  max-width: 260px;
+  max-width: 240px;
   object-fit: contain;
   flex-shrink: 0;
 }
 
 h1 {
-  font-size: 23px;
-  font-weight: 700;
+  font-family: "Plus Jakarta Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 800;
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+  color: var(--ink);
 }
 .app-subtitle {
-  margin: 2px 0 0;
+  margin: 4px 0 0;
   font-size: 13.5px;
   color: var(--muted);
 }
@@ -142,12 +162,9 @@ h2 {
 .site-tabs {
   display: flex;
   gap: 6px;
-  margin-bottom: 28px;
-  padding: 6px;
-  background: rgba(255, 255, 255, .6);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  width: fit-content;
+  padding: 10px 22px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
 }
 .site-tab {
   display: flex;
@@ -162,11 +179,11 @@ h2 {
   border: none;
   border-radius: 10px;
   cursor: pointer;
-  transition: background .15s, color .15s, box-shadow .15s;
+  transition: background .2s, color .2s, box-shadow .2s;
 }
 .site-tab:hover {
   color: var(--ink);
-  background: rgba(52, 84, 209, .06);
+  background: rgba(52, 84, 209, .08);
 }
 .site-tab.active {
   color: var(--ink);
