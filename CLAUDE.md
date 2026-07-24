@@ -180,6 +180,10 @@ Format : `{EAN14}_C{Face}{AngleH}{Contenu}_s{NN}[_FAB_{fabricant}]`. Exemple : `
 - Routes Flask : `POST /api/superu/upload`, `POST /api/superu/process`.
 - Hors périmètre pour l'instant : les conventions Super U pour les **documents** (`DOC_{EAN14}_{type}`, ex. notices) et les **logos** (`LOGO_{nom}`) décrites dans le même cahier des charges — seul le flux "visuels produits unitaires" a été implémenté.
 
+## Mode clair / sombre
+
+Bouton (icône soleil/lune) dans l'en-tête, à droite du titre. Bascule instantanée via l'attribut `data-theme` sur `<html>` (`light`/`dark`), toutes les couleurs de `style.css` étant définies en variables CSS (`:root` pour le clair, `:root[data-theme="dark"]` pour le sombre) — aucun composant n'a de couleur en dur en dehors de ce système de variables. Choix persisté dans `localStorage` (clé `theme`), sinon la préférence système (`prefers-color-scheme`) sert de valeur par défaut au premier chargement. Un petit script inline dans le `<head>` (avant le CSS) applique le thème immédiatement pour éviter un flash de la mauvaise couleur au chargement. Contrastes texte/fond vérifiés manuellement en mode sombre (WCAG AA, ratio ≥ 4.5:1).
+
 ## Architecture technique
 
 - **Stack** : Python 3.12 + Flask + Pillow, interface web locale (HTML/CSS/JS vanilla)

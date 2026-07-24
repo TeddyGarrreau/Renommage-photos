@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <title>Renommage photos - ADD-ONE</title>
+<script>
+(function () {
+  var saved = localStorage.getItem("theme");
+  var theme = saved === "dark" || saved === "light" ? saved : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.setAttribute("data-theme", theme);
+})();
+</script>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -15,6 +22,15 @@
         <h1>Renommage automatique de photos</h1>
         <p class="app-subtitle">Prépare et exporte tes visuels produits pour le PIM Quable et pour Carrefour</p>
       </div>
+      <button id="themeToggleBtn" class="theme-toggle" type="button" title="Passer en mode sombre" aria-label="Passer en mode sombre">
+        <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+        </svg>
+        <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
     </header>
 
     <div class="site-tabs">

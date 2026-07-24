@@ -1,3 +1,23 @@
+// --- Theme toggle (light/dark) ---
+
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const label = theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre";
+  themeToggleBtn.title = label;
+  themeToggleBtn.setAttribute("aria-label", label);
+}
+
+themeToggleBtn.addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme");
+  const next = current === "dark" ? "light" : "dark";
+  localStorage.setItem("theme", next);
+  applyTheme(next);
+});
+
+applyTheme(document.documentElement.getAttribute("data-theme") || "light");
+
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 const studioGroupEl = document.getElementById("studioGroup");
