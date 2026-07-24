@@ -757,6 +757,7 @@ async function handleCarrefourFiles(fileList) {
     const suggestedNature = item.suggested ? item.suggested.nature : "";
     carrefourPhotos.push({
       ...item,
+      ean: item.parsed ? item.parsed.ean : "",
       angle: item.suggested ? item.suggested.angle : "1",
       nature: suggestedNature === null ? "?" : suggestedNature,
       info: item.suggested ? item.suggested.info : false,
@@ -767,9 +768,10 @@ async function handleCarrefourFiles(fileList) {
 }
 
 function carrefourFilenamePreview(p) {
-  if (!p.parsed) return "(nom non reconnu)";
+  const ean = p.parsed ? p.parsed.ean : (p.ean || "").trim();
+  if (!ean || ean.length !== 13) return "(renseigne un EAN valide - 13 chiffres)";
   if (p.nature === "?") return "(choisir Emballé ou Nu avant traitement)";
-  const parts = [p.parsed.ean, p.angle];
+  const parts = [ean, p.angle];
   if (p.nature) parts.push(p.nature);
   if (p.info) parts.push("i");
   return parts.join("_") + ".jpg";
@@ -811,7 +813,24 @@ function carrefourCardHtml(p) {
       <img src="${p.preview_url}" alt="">
       <div class="meta">
         <div class="name">${p.original_name}</div>
-        <div class="lookup-status not-found">Nom non reconnu — attendu : convention Add-One (ex: 710306_3601029899278_P_H1S_P_S01_2023_I.jpg)</div>
+        <div class="lookup-status not-found">Nom non reconnu (convention Add-One attendue) — renseigne l'EAN manuellement</div>
+        ${lowResWarningHtml(p)}
+        <label>EAN (13 chiffres)
+          <input type="text" class="cf-ean" value="${p.ean || ""}" placeholder="3601029899278" maxlength="13">
+        </label>
+        <div class="fields">
+          <label>Angle
+            <select class="cf-angle">${optionsHtml(window.CARREFOUR_ANGLE_LABELS, p.angle)}</select>
+          </label>
+          <label>Nature
+            <select class="cf-nature">${carrefourNatureOptionsHtml(p)}</select>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" class="cf-info" ${p.info ? "checked" : ""}>
+            Info produit visible (i)
+          </label>
+        </div>
+        <div class="preview-name">${carrefourFilenamePreview(p)}</div>
       </div>
       <button class="remove-btn" title="Supprimer cette photo">&times;</button>
     </div>`;
@@ -853,9 +872,14 @@ function wireCarrefourCards() {
     const photo = carrefourPhotos.find((p) => p.temp_id === id);
     card.querySelector(".remove-btn").addEventListener("click", () => removeCarrefourPhoto(id));
 
-    if (!photo.parsed) return;
-
     const previewEl = card.querySelector(".preview-name");
+    const eanInput = card.querySelector(".cf-ean");
+    if (eanInput) {
+      eanInput.addEventListener("input", (e) => {
+        photo.ean = e.target.value.trim();
+        previewEl.textContent = carrefourFilenamePreview(photo);
+      });
+    }
     card.querySelector(".cf-angle").addEventListener("change", (e) => {
       photo.angle = e.target.value;
       previewEl.textContent = carrefourFilenamePreview(photo);
@@ -889,17 +913,9 @@ carrefourProcessBtn.addEventListener("click", async () => {
     return;
   }
 
-  const unparsed = carrefourPhotos.filter((p) => !p.parsed);
-  const parsed = carrefourPhotos.filter((p) => p.parsed);
-
-  const preResults = unparsed.map((p) => ({
+  const items = carrefourPhotos.map((p) => ({
     temp_id: p.temp_id,
-    error: "Nom de fichier non reconnu (convention Add-One requise)",
-  }));
-
-  const items = parsed.map((p) => ({
-    temp_id: p.temp_id,
-    ean: p.parsed.ean,
+    ean: p.parsed ? p.parsed.ean : (p.ean || "").trim(),
     angle: p.angle,
     nature: p.nature,
     info: p.info,
@@ -908,7 +924,7 @@ carrefourProcessBtn.addEventListener("click", async () => {
   carrefourProcessBtn.disabled = true;
   carrefourProcessBtn.textContent = "Traitement en cours...";
 
-  let results = preResults;
+  let results = [];
   if (items.length) {
     try {
       const res = await fetch("/api/carrefour/process", {
@@ -917,8 +933,7 @@ carrefourProcessBtn.addEventListener("click", async () => {
         body: JSON.stringify({ items, dest_folder: destFolder }),
       });
       if (!res.ok) throw new Error(`Erreur serveur (${res.status})`);
-      const serverResults = await res.json();
-      results = preResults.concat(serverResults);
+      results = await res.json();
     } catch (err) {
       carrefourResultListEl.innerHTML = `<div class="result-banner error">Le traitement a échoué : ${err.message}</div>`;
       carrefourProcessBtn.disabled = false;
@@ -1022,9 +1037,10 @@ async function handleSuperuFiles(fileList) {
   const uploaded = await res.json();
 
   for (const item of uploaded) {
-    const suggestedContenu = item.suggested ? item.suggested.contenu : "";
+    const suggestedContenu = item.suggested ? item.suggested.contenu : "?";
     superuPhotos.push({
       ...item,
+      ean: item.parsed ? item.parsed.ean : "",
       face: item.suggested ? item.suggested.face : "1",
       angle_h: item.suggested ? item.suggested.angle_h : "N",
       contenu: suggestedContenu === null ? "?" : suggestedContenu,
@@ -1045,9 +1061,10 @@ function toEan14(ean13) {
 }
 
 function superuFilenamePreview(p) {
-  if (!p.parsed) return "(nom non reconnu)";
+  const ean = p.parsed ? p.parsed.ean : (p.ean || "").trim();
+  if (!ean || ean.length !== 13) return "(renseigne un EAN valide - 13 chiffres)";
   if (p.contenu === "?") return "(choisir Nu/déballé, Préparé, Emballé ou Mise en situation avant traitement)";
-  let name = `${toEan14(p.parsed.ean)}_C${p.face}${p.angle_h}${p.contenu}_s••`;
+  let name = `${toEan14(ean)}_C${p.face}${p.angle_h}${p.contenu}_s••`;
   if (p.fab) name += `_FAB_${p.fab}`;
   return name + ".jpg";
 }
@@ -1081,7 +1098,26 @@ function superuCardHtml(p) {
       <img src="${p.preview_url}" alt="">
       <div class="meta">
         <div class="name">${p.original_name}</div>
-        <div class="lookup-status not-found">Nom non reconnu — attendu : convention Add-One (ex: 710306_3601029899278_P_H1S_P_S01_2023_I.jpg)</div>
+        <div class="lookup-status not-found">Nom non reconnu (convention Add-One attendue) — renseigne l'EAN manuellement</div>
+        ${superuMinSizeWarningHtml(p)}
+        <label>EAN (13 chiffres)
+          <input type="text" class="su-ean" value="${p.ean || ""}" placeholder="3601029899278" maxlength="13">
+        </label>
+        <div class="fields">
+          <label>Face
+            <select class="su-face">${optionsHtml(window.SUPERU_FACE_LABELS, p.face)}</select>
+          </label>
+          <label>Angle horizontal
+            <select class="su-angle-h">${optionsHtml(window.SUPERU_ANGLE_H_LABELS, p.angle_h)}</select>
+          </label>
+          <label>Contenu
+            <select class="su-contenu">${superuContenuOptionsHtml(p)}</select>
+          </label>
+          <label>Fabricant (optionnel)
+            <input type="text" class="su-fab" value="${p.fab || ""}" placeholder="ex: usinor">
+          </label>
+        </div>
+        <div class="preview-name">${superuFilenamePreview(p)}</div>
       </div>
       <button class="remove-btn" title="Supprimer cette photo">&times;</button>
     </div>`;
@@ -1125,9 +1161,14 @@ function wireSuperuCards() {
     const photo = superuPhotos.find((p) => p.temp_id === id);
     card.querySelector(".remove-btn").addEventListener("click", () => removeSuperuPhoto(id));
 
-    if (!photo.parsed) return;
-
     const previewEl = card.querySelector(".preview-name");
+    const eanInput = card.querySelector(".su-ean");
+    if (eanInput) {
+      eanInput.addEventListener("input", (e) => {
+        photo.ean = e.target.value.trim();
+        previewEl.textContent = superuFilenamePreview(photo);
+      });
+    }
     card.querySelector(".su-face").addEventListener("change", (e) => {
       photo.face = e.target.value;
       previewEl.textContent = superuFilenamePreview(photo);
@@ -1154,7 +1195,7 @@ function renderSuperu() {
 }
 
 superuProcessBtn.addEventListener("click", async () => {
-  const unresolved = superuPhotos.filter((p) => p.parsed && p.contenu === "?");
+  const unresolved = superuPhotos.filter((p) => p.contenu === "?");
   if (unresolved.length) {
     alert(
       `${unresolved.length} photo(s) attendent un choix de contenu (Nu/déballé, Préparé, Emballé ou Mise en situation) avant de pouvoir traiter.`
@@ -1162,17 +1203,9 @@ superuProcessBtn.addEventListener("click", async () => {
     return;
   }
 
-  const unparsed = superuPhotos.filter((p) => !p.parsed);
-  const parsed = superuPhotos.filter((p) => p.parsed);
-
-  const preResults = unparsed.map((p) => ({
+  const items = superuPhotos.map((p) => ({
     temp_id: p.temp_id,
-    error: "Nom de fichier non reconnu (convention Add-One requise)",
-  }));
-
-  const items = parsed.map((p) => ({
-    temp_id: p.temp_id,
-    ean: p.parsed.ean,
+    ean: p.parsed ? p.parsed.ean : (p.ean || "").trim(),
     face: p.face,
     angle_h: p.angle_h,
     contenu: p.contenu,
@@ -1182,7 +1215,7 @@ superuProcessBtn.addEventListener("click", async () => {
   superuProcessBtn.disabled = true;
   superuProcessBtn.textContent = "Traitement en cours...";
 
-  let results = preResults;
+  let results = [];
   if (items.length) {
     try {
       const res = await fetch("/api/superu/process", {
@@ -1191,8 +1224,7 @@ superuProcessBtn.addEventListener("click", async () => {
         body: JSON.stringify({ items, dest_folder: superuDestFolder }),
       });
       if (!res.ok) throw new Error(`Erreur serveur (${res.status})`);
-      const serverResults = await res.json();
-      results = preResults.concat(serverResults);
+      results = await res.json();
     } catch (err) {
       superuResultListEl.innerHTML = `<div class="result-banner error">Le traitement a échoué : ${err.message}</div>`;
       superuProcessBtn.disabled = false;
