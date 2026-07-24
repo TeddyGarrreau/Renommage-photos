@@ -183,6 +183,18 @@ def api_process():
     return jsonify(results)
 
 
+@app.route("/api/open-folder", methods=["POST"])
+def api_open_folder():
+    payload = request.get_json(force=True)
+    path = str(payload.get("path") or "").strip()
+
+    if not path or not os.path.isdir(path):
+        return jsonify({"error": "Dossier introuvable"}), 400
+
+    os.startfile(path)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/browse-folder")
 def api_browse_folder():
     try:

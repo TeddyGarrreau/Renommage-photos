@@ -63,6 +63,8 @@ Champs saisis par photo :
 
 **Confirmation de traitement** : au clic sur "Traiter et renommer", un bandeau s'affiche au-dessus des résultats — vert "X photo(s) traitée(s) avec succès" si tout est OK, orange si succès partiel (X traitées / Y erreurs), rouge si échec total (erreurs ou requête réseau en échec).
 
+**Bouton "Ouvrir le dossier"** : sous le bandeau de résultat, un bouton par dossier de destination distinct utilisé dans le lot (généralement un seul, mais plusieurs références traitées ensemble peuvent donner plusieurs dossiers) ouvre directement ce dossier dans l'Explorateur Windows (`os.startfile`, route `POST /api/open-folder`). Pensé pour enchaîner rapidement vers un glisser-déposer manuel dans l'écran d'import média du PIM Quable (`Données > Médias > Import`) — pas d'intégration API directe avec ce DAM pour l'instant, faute d'endpoint documenté publiquement (à investiguer auprès du support Quable si besoin un jour).
+
 ## Flux "studio"
 
 Nom de fichier généré par l'appareil studio, exemple : `I_7085_3700256070853_P_2026_133_1_HD_1_1`

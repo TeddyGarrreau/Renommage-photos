@@ -101,6 +101,33 @@ function lowResWarningHtml(p) {
   return `<div class="lookup-status not-found">Résolution source ${p.width}x${p.height}px, inférieure à 3000x3000 — l'image sera agrandie et pourra perdre en netteté</div>`;
 }
 
+function openFolderButtonsHtml(results) {
+  const folders = [...new Set(
+    results.filter((r) => !r.error && r.path).map((r) => r.path.substring(0, r.path.lastIndexOf("\\")))
+  )];
+  if (!folders.length) return "";
+  return `<div class="open-folder-row">${folders
+    .map((f) => `<button class="link-btn open-folder-btn" data-folder="${f}">Ouvrir le dossier (${f})</button>`)
+    .join("")}</div>`;
+}
+
+function wireOpenFolderButtons(container) {
+  container.querySelectorAll(".open-folder-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/open-folder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: btn.dataset.folder }),
+        });
+        if (!res.ok) throw new Error();
+      } catch {
+        alert("Impossible d'ouvrir le dossier.");
+      }
+    });
+  });
+}
+
 function optionsHtml(labels, selected) {
   return Object.entries(labels)
     .map(
@@ -640,6 +667,7 @@ processBtn.addEventListener("click", async () => {
 
   resultListEl.innerHTML =
     banner +
+    openFolderButtonsHtml(results) +
     results
       .map((r) =>
         r.error
@@ -647,6 +675,7 @@ processBtn.addEventListener("click", async () => {
           : `<div class="result-row"><span>${r.path}</span><span>${r.size_kb} Ko</span></div>`
       )
       .join("");
+  wireOpenFolderButtons(resultListEl);
 
   photos = [];
   manualGroups = new Map();

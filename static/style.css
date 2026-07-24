@@ -377,6 +377,12 @@ input.invalid {
 .link-btn:hover {
   color: var(--primary-dark);
 }
+.open-folder-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
 .checkbox-label {
   flex-direction: row !important;
   align-items: center;
