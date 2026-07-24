@@ -184,6 +184,10 @@ Format : `{EAN14}_C{Face}{AngleH}{Contenu}_s{NN}[_FAB_{fabricant}]`. Exemple : `
 
 Bouton (icône soleil/lune) dans l'en-tête, à droite du titre. Bascule instantanée via l'attribut `data-theme` sur `<html>` (`light`/`dark`), toutes les couleurs de `style.css` étant définies en variables CSS (`:root` pour le clair, `:root[data-theme="dark"]` pour le sombre) — aucun composant n'a de couleur en dur en dehors de ce système de variables. Choix persisté dans `localStorage` (clé `theme`), sinon la préférence système (`prefers-color-scheme`) sert de valeur par défaut au premier chargement. Un petit script inline dans le `<head>` (avant le CSS) applique le thème immédiatement pour éviter un flash de la mauvaise couleur au chargement. Contrastes texte/fond vérifiés manuellement en mode sombre (WCAG AA, ratio ≥ 4.5:1).
 
+## Zones de dépôt (dropzones)
+
+Un picto cycliste (SVG inline, `.dropzone-bike`) tourne en boucle le long du contour pointillé des 3 zones de dépôt, via `offset-path: border-box` (CSS) — suit exactement le tracé arrondi du cadre quelle que soit sa taille, aucun chemin codé en dur. Couleur héritée de `--primary` (s'adapte au thème clair/sombre). Dégradation silencieuse si `offset-path` non supporté (`@supports not`, picto masqué). Respecte déjà la règle globale `prefers-reduced-motion` du fichier CSS.
+
 ## Architecture technique
 
 - **Stack** : Python 3.12 + Flask + Pillow, interface web locale (HTML/CSS/JS vanilla)
